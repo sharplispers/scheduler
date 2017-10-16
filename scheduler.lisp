@@ -149,9 +149,14 @@
 
   (defun parse-cron-time-1 (spec range)
     (db (base . step) (ppcre:split "/" spec)
-      (if (null step)
-          (%parse-cron-time-1/no-step base range)
-          (%parse-cron-time-1/step base range (parse-integer (car step))))))
+      (let ((parse-result
+             (if (null step)
+                 (%parse-cron-time-1/no-step base range)
+                 (%parse-cron-time-1/step base range (parse-integer (car step))))))
+        (assert (or (eql parse-result :every)
+                    (every (lambda (n) (member n range)) parse-result))
+                nil "PARSE-CRON-TIME-1: Each element of ~s must be a member of:~%~s."
+                parse-result (cons :every range)))))
 
   #+test
   (defun test-parse-cron-time-1 (&aux (range (alexandria:iota 30)))
