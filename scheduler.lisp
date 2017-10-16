@@ -1,6 +1,10 @@
 
 (eval-when (:execute :compile-toplevel :load-toplevel)
-  (asdf:load-systems 'alexandria 'split-sequence 'local-time))
+  (asdf:load-systems 'alexandria
+                     'split-sequence
+                     'local-time
+                     'optima
+                     'optima.ppcre))
 
 (defpackage #:scheduler
   (:use)
@@ -124,7 +128,7 @@
 (defun next-occurance (entry)
   (when (local-time:timestamp>= (local-time:now)
                                 (scheduler-entry-next-occurance entry))
-    (log:warn "Missed occurance, scheduling somewhere soon!")))
+    (warn "Missed occurance, scheduling somewhere soon!")))
 
 ;; (list
 ;;  :every
