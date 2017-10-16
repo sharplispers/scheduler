@@ -232,9 +232,95 @@
 
 ;;; we assume here that all `:random' entries are already picked and
 ;;; if `:step' present already coerced to sets.
-(defun compute-next-occurance (spec &optional (starting-of (local-time:now)))
-  )
+(progn
+  ;; based on https://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time#3453872
+  (defun compute-next-occurance (spec &optional (time (local-time:now)))
+    (flet ((next-fit (n set) (find-if (lambda (s) (< n s)) set))
+           (first* (set default)
+             (if (eql set :every)
+                 default
+                 (first set)))
+           (day-offset (now set default)
+             (let ((day (local-time:timestamp-day now))
+                   (mday (local-time:days-in-month (local-time:timestamp-month now)
+                                                   (local-time:timestamp-year now)))
+                   (target (if (eql set :every)
+                               default
+                               (first set))))
+               (+ (- mday day) target))))
+      (symbol-macrolet ((next.minute (local-time:timestamp-minute time))
+                        (next.hour (local-time:timestamp-hour time))
+                        (next.weekday (local-time:timestamp-day-of-week time))
+                        (next.day (local-time:timestamp-day time))
+                        (next.month (local-time:timestamp-month time))
+                        (next.year (local-time:timestamp-year time)))
+        (destructuring-bind (&key minute hour day-of-month month day-of-week)
+            spec
+          (loop
+             do (block nil
+                  (format *debug-io* "trying ~A~%" (local-time:format-timestring nil time))
+                  ;; nudge minute
+                  (unless (match-spec next.minute minute)
+                    (^if (next-fit next.minute minute)
+                         (local-time:adjust-timestamp! time
+                           (set :minute to ^it))
+                         (local-time:adjust-timestamp! time
+                           (offset :hour by 1)
+                           (set :minute to (first* minute 0))))
+                    (return))
+                  ;; nudge hour
+                  (unless (match-spec next.hour hour)
+                    (^if (next-fit next.hour hour)
+                         (local-time:adjust-timestamp! time
+                           (set :hour to ^it)
+                           (set :minute to (first* minute 0)))
+                         (local-time:adjust-timestamp! time
+                           (offset :day by 1)
+                           (set :hour to (first* hour 0))
+                           (set :minute to (first* minute 0))))
+                    (return))
+                  ;; nudge weekday
+                  (unless (match-spec next.weekday day-of-week)
+                    (let ((delta (- (first day-of-week) next.weekday)))
+                      (when (minusp delta) (incf delta 7))
+                      (local-time:adjust-timestamp! time
+                        (offset :day by delta)
+                        (set :hour to (first* hour 0))
+                        (set :minute to (first* minute 0)))
+                      (return)))
+                  ;; nudge month day
+                  (unless (match-spec next.day day-of-month)
+                    (^if (next-fit next.day day-of-month)
+                         (local-time:adjust-timestamp! time
+                           (offset :day by (- ^it next.day))
+                           (set :hour to (first* hour 0))
+                           (set :minute to (first* minute 0)))
+                         (local-time:adjust-timestamp! time
+                           (offset :day by (day-offset time day-of-month 1))
+                           (set :hour to (first* hour 0))
+                           (set :minute to (first* minute 0))))
+                    (return))
+                  ;; nudge month
+                  (unless (match-spec next.month month)
+                    (^if (next-fit next.month month)
+                         (local-time:adjust-timestamp! time
+                           (set :month to ^it)
+                           ;; always get back to 1 to prevent month bump!
+                           (offset :day by (1+ (- next.day)))
+                           (set :hour to (first* hour 0))
+                           (set :minute to (first* minute 0)))
+                         (local-time:adjust-timestamp! time
+                           (offset :month by (+ (- 12 next.month)
+                                                (first month)))
+                           ;; same as above
+                           (offset :day by (1+ (- next.day)))
+                           (set :hour to (first* hour 0))
+                           (set :minute to (first* minute 0))))
+                    (return))
+                  (return-from compute-next-occurance time)))))))
 
+  (defun test-compute-next-occurance ()
+    (compute-next-occurance (parse-cron-entry "0 0 0 0 0 foo"))))
 
 (defun next-occurance (entry)
   (when (local-time:timestamp>= (local-time:now)
