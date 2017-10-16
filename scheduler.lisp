@@ -289,3 +289,8 @@
 ;; (defun schedule-task (time task)
 ;;   )
 
+(defmacro ^if (test if-true if-false)
+  `(let ((^it ,test))
+     (if ^it
+         ,if-true
+         ,if-false)))
