@@ -97,38 +97,72 @@
       (assert (null (handler-case (parse "@foo 3 4 ")      (simple-error () nil))))
       (assert (null (handler-case (parse "@foo 3 4 1 1 2") (simple-error () nil)))))))
 
-(defun parse-cron-time (spec range)
-  (flet ((every-nth (list step)
-           (if (= 1 step)
-               list
-               (loop for elt in list by #'(lambda (l) (nthcdr step l))
-                  collect elt)))
-         (every-nth* (from to step)
-           (let ((set-size (1+ (floor (/ (- to from) step)))))
-             (alexandria:iota set-size :start from :step step)))
-         (fix-step (step)
-           (if (null step)
-               1
-               (parse-integer (car step)))))
-   (db (base . step) (ppcre:split "/" spec)
-     (setf step (fix-step step))
-     (optima:match base
-       ("*" (every-nth range step))
-       ("H" (alexandria:random-elt range))
-       ((optima.ppcre:ppcre ".*,.*")
-        (mapcar #'parse-integer (if (null step)
-                                    #1=(ppcre:split "," base)
-                                    (every-nth #1# step))))
-       ((optima.ppcre:ppcre "H\\((.*)-(.*)\\)" from to)
-        (setf to (parse-integer to)
-              from (min to
-                        (alexandria:random-elt
-                         (alexandria:iota step :start (parse-integer from)))))
-        (every-nth* from to step))
-       ((optima.ppcre:ppcre "(.*)-(.*)" from to)
-        (every-nth* (parse-integer from)
-                    (parse-integer to)
-                    step))))))
+(progn
+  (defun %parse-cron-time-1/no-step (spec range)
+    (optima:ematch spec
+      ("*" :every)
+      ("H" (alexandria:random-elt range))
+      ;; 1,2,4,8
+      ((optima.ppcre:ppcre "^[0-9]*,.*")
+       (mapcar #'parse-integer (ppcre:split "," spec)))
+      ;; H(1-12)
+      ((optima.ppcre:ppcre "H\\(([0-9]*)-([0-9]*)\\)" from to)
+       (let* ((from (parse-integer from))
+              (to (parse-integer to))
+              (size (1+ (- to from))))
+         (alexandria:random-elt (alexandria:iota size :start from))))
+      ;; 1-12
+      ((optima.ppcre:ppcre "([0-9]*)-([0-9]*)" from to)
+       (alexandria:iota (1+ (- to from)) :start from))))
+
+  (defun %parse-cron-time-1/step (spec range step)
+    (flet ((every-nth (list step)
+             (if (= 1 step)
+                 list
+                 (loop for elt in list by #'(lambda (l) (nthcdr step l))
+                    collect elt)))
+           (every-nth* (from to step)
+             (let ((set-size (1+ (floor (/ (- to from) step)))))
+               (alexandria:iota set-size :start from :step step))))
+      (optima:ematch spec
+        ;; */2
+        ("*" (every-nth range step))
+        ;; H/2
+        ("H" (every-nth (nthcdr (random step) range) step))
+        ;; H(1-14)/3
+        ((optima.ppcre:ppcre "H\\(([0-9]*)-([0-9]*)\\)" from to)
+         (let* ((to (parse-integer to))
+                (from (min to
+                           (alexandria:random-elt
+                            (alexandria:iota step :start (parse-integer from))))))
+           (every-nth* from to step)))
+        ;; 1-14/3
+        ((optima.ppcre:ppcre "([0-9]*)-([0-9]*)" from to)
+         (every-nth* (parse-integer from)
+                     (parse-integer to)
+                     step))
+        #+invalid ; this is invalid, but we catch it with ematch anyway
+        ((optima.ppcre:ppcre "[H]?.*,.*")
+         (error "invalid clause")))))
+
+  (defun parse-cron-time-1 (spec range)
+    (db (base . step) (ppcre:split "/" spec)
+      (if (null step)
+          (%parse-cron-time-1/no-step base range)
+          (%parse-cron-time-1/step base range (parse-integer (car step))))))
+
+  (defun test-parse-cron-time-1 (&aux (range (alexandria:iota 30)))
+    (assert (equalp (parse-cron-time-1 "*" range) :every))
+    (assert (equalp (parse-cron-time-1 "*/2" '(1 2 3 4 5 6 7)) '(1 3 5 7)))
+    (assert (equalp (parse-cron-time-1 "*/3" '(1 2 3 4 5 6 7)) '(1 4 7)))
+    (let ((result (parse-cron-time-1 "H/2" '(1 2 3 4 5 6 7))))
+      (assert (or (equalp result '(1 3 5 7))
+                  (equalp result '(2 4 6)))))
+    (let ((result (parse-cron-time-1 "H(8-12)/2" range)))
+      (assert (or (equalp result '(8 10 12)) (equalp result '(9 11)))))
+    (assert (member (parse-cron-time-1 "H(8-12)" range) (alexandria:iota 5 :start 8)))
+    (assert (null (handler-case (parse-cron-time-1 "H(1,2)" range) (error () nil))))
+    (assert (null (handler-case (parse-cron-time-1 "1,2,4/2" '(1 2 3 4)) (error () nil))))))
 
 
 (defun match-spec (obj spec)
