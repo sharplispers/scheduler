@@ -171,6 +171,36 @@
     ;; we let that pass (due to being lazy) "1/" === "1"
     #+ (or) (assert (null (handler-case (parse-cron-time-1 "1/" range) (error () nil))))))
 
+(progn
+  (defun parse-cron-entry (spec &aux (spec (parse-cron-spec spec)))
+    (if (member (car spec) '(:reboot :shutdown))
+        (values (car spec) (cdr spec))
+        (destructuring-bind ((minute hour day-of-month month day-of-week) . command)
+            spec
+          (values
+           (list :minute (parse-cron-time-1 minute '#.(alexandria:iota 60))
+                 :hour (parse-cron-time-1 hour '#.(alexandria:iota 24))
+                 :day-of-month (if (char= (elt day-of-month 0) #\H)
+                                   (parse-cron-time-1 day-of-month '#.(alexandria:iota 28 :start 1))
+                                   (parse-cron-time-1 day-of-month '#.(alexandria:iota 31 :start 1)))
+                 :month (parse-cron-time-1 month '#.(alexandria:iota 12 :start 1))
+                 :day-of-week (if (string= day-of-week "7")
+                                  (parse-cron-time-1 "0" '#.(alexandria:iota 7))
+                                  (parse-cron-time-1 day-of-week '#.(alexandria:iota 7))))
+           command))))
+
+  ;; for now we only check, if correct entries doesn't signal
+  ;; condition, so no assertions here.
+  #+test
+  (defun test-parse-cron-entry ()
+    (parse-cron-entry "@reboot foo")
+    (parse-cron-entry "@shutdown foo")
+    (parse-cron-entry "@yearly foo")
+    (parse-cron-entry "@weekly foo")
+    (parse-cron-entry "@daily foo")
+    (parse-cron-entry "@midnight foo")
+    (parse-cron-entry "@annually foo")
+    (parse-cron-entry "0 0 0 0 0 foo")))
 
 
 (defun match-spec (obj spec)
