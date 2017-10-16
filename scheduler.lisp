@@ -208,24 +208,33 @@
     (parse-cron-entry "0 0 0 0 0 foo")))
 
 
-(defun match-spec (obj spec)
-  (or (eql :every spec)
-      (member obj spec)))
+(progn
+  (defun match-spec (obj spec)
+    (or (eql :every spec)
+        (member obj spec)))
+
+  (defun is-it-now? (spec &optional (starting-of (local-time:now)))
+    (destructuring-bind (&key minute hour day-of-month month day-of-week)
+        spec
+      (and
+       (match-spec (local-time:timestamp-day-of-week starting-of) day-of-week)
+       (match-spec (local-time:timestamp-month starting-of) month)
+       (match-spec (local-time:timestamp-day starting-of) day-of-month)
+       (match-spec (local-time:timestamp-hour starting-of) hour)
+       (match-spec (local-time:timestamp-minute starting-of) minute))))
+
+  (defun test-is-it-now? ()
+    (assert (is-it-now? (parse-cron-entry "* * * * * foo") (local-time:now)))
+    (assert (is-it-now? (parse-cron-entry "* * * 4 * foo")
+                        (local-time:encode-timestamp 0 14 12 8 15 4 2017)))
+    (assert (null (is-it-now? (parse-cron-entry "* * * 4 * foo")
+                              (local-time:encode-timestamp 0 14 12 8 15 5 2017))))))
 
 ;;; we assume here that all `:random' entries are already picked and
 ;;; if `:step' present already coerced to sets.
 (defun compute-next-occurance (spec &optional (starting-of (local-time:now)))
   )
 
-(defun is-it-now? (spec &optional (starting-of (local-time:now)))
-  (destructuring-bind (&key minute hour day-of-month month day-of-week)
-      spec
-    (and
-     (match-spec (local-time:timestamp-day-of-week starting-of) day-of-week)
-     (match-spec (local-time:timestamp-month starting-of) month)
-     (match-spec (local-time:timestamp-day starting-of) day-of-month)
-     (match-spec (local-time:timestamp-hour starting-of) hour)
-     (match-spec (local-time:timestamp-minute starting-of) minute))))
 
 (defun next-occurance (entry)
   (when (local-time:timestamp>= (local-time:now)
