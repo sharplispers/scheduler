@@ -101,7 +101,7 @@
   (defun %parse-cron-time-1/no-step (spec range)
     (optima:ematch spec
       ("*" :every)
-      ("H" (alexandria:random-elt range))
+      ("H" (list (alexandria:random-elt range)))
       ((optima.ppcre:ppcre "(^[0-9]+)" number)
        (list (parse-integer number)))
       ;; 1,2,4,8
