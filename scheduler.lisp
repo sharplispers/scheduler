@@ -102,17 +102,19 @@
     (optima:ematch spec
       ("*" :every)
       ("H" (alexandria:random-elt range))
+      ((optima.ppcre:ppcre "(^[0-9]+)" number)
+       (list (parse-integer number)))
       ;; 1,2,4,8
-      ((optima.ppcre:ppcre "^[0-9]*,.*")
+      ((optima.ppcre:ppcre "^[0-9]+,.*")
        (mapcar #'parse-integer (ppcre:split "," spec)))
       ;; H(1-12)
-      ((optima.ppcre:ppcre "H\\(([0-9]*)-([0-9]*)\\)" from to)
+      ((optima.ppcre:ppcre "H\\(([0-9]+)-([0-9]+)\\)" from to)
        (let* ((from (parse-integer from))
               (to (parse-integer to))
               (size (1+ (- to from))))
          (alexandria:random-elt (alexandria:iota size :start from))))
       ;; 1-12
-      ((optima.ppcre:ppcre "([0-9]*)-([0-9]*)" from to)
+      ((optima.ppcre:ppcre "([0-9]+)-([0-9]+)" from to)
        (alexandria:iota (1+ (- to from)) :start from))))
 
   (defun %parse-cron-time-1/step (spec range step)
@@ -130,14 +132,14 @@
         ;; H/2
         ("H" (every-nth (nthcdr (random step) range) step))
         ;; H(1-14)/3
-        ((optima.ppcre:ppcre "H\\(([0-9]*)-([0-9]*)\\)" from to)
+        ((optima.ppcre:ppcre "H\\(([0-9]+)-([0-9]+)\\)" from to)
          (let* ((to (parse-integer to))
                 (from (min to
                            (alexandria:random-elt
                             (alexandria:iota step :start (parse-integer from))))))
            (every-nth* from to step)))
         ;; 1-14/3
-        ((optima.ppcre:ppcre "([0-9]*)-([0-9]*)" from to)
+        ((optima.ppcre:ppcre "([0-9]+)-([0-9]+)" from to)
          (every-nth* (parse-integer from)
                      (parse-integer to)
                      step))
