@@ -153,10 +153,12 @@
           (%parse-cron-time-1/no-step base range)
           (%parse-cron-time-1/step base range (parse-integer (car step))))))
 
+  #+test
   (defun test-parse-cron-time-1 (&aux (range (alexandria:iota 30)))
     (assert (equalp (parse-cron-time-1 "*" range) :every))
     (assert (equalp (parse-cron-time-1 "*/2" '(1 2 3 4 5 6 7)) '(1 3 5 7)))
     (assert (equalp (parse-cron-time-1 "*/3" '(1 2 3 4 5 6 7)) '(1 4 7)))
+    (assert (equalp (parse-cron-time-1 "18" range) '(18)))
     (let ((result (parse-cron-time-1 "H/2" '(1 2 3 4 5 6 7))))
       (assert (or (equalp result '(1 3 5 7))
                   (equalp result '(2 4 6)))))
@@ -164,7 +166,11 @@
       (assert (or (equalp result '(8 10 12)) (equalp result '(9 11)))))
     (assert (member (parse-cron-time-1 "H(8-12)" range) (alexandria:iota 5 :start 8)))
     (assert (null (handler-case (parse-cron-time-1 "H(1,2)" range) (error () nil))))
-    (assert (null (handler-case (parse-cron-time-1 "1,2,4/2" '(1 2 3 4)) (error () nil))))))
+    (assert (null (handler-case (parse-cron-time-1 "1,2,4/2" '(1 2 3 4)) (error () nil))))
+    (assert (null (handler-case (parse-cron-time-1 "18/2" range) (error () nil))))
+    ;; we let that pass (due to being lazy) "1/" === "1"
+    #+ (or) (assert (null (handler-case (parse-cron-time-1 "1/" range) (error () nil))))))
+
 
 
 (defun match-spec (obj spec)
