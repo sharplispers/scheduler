@@ -29,6 +29,20 @@
                 #:list-scheduler-tasks))
 (in-package #:scheduler-implementation)
 
+(progn
+  ;; utils
+  (defmacro ss (&rest args)
+    `(split-sequence:split-sequence #\space ,@args))
+
+  (defmacro db (lambda-list expression &body body)
+    `(destructuring-bind ,lambda-list ,expression ,@body))
+
+  (defmacro ^if (test if-true if-false)
+    `(let ((^it ,test))
+       (if ^it
+           ,if-true
+           ,if-false))))
+
 (defstruct scheduler-entry
   schedule-specs
   last-occurance
@@ -39,12 +53,6 @@
   (status :scheduled)
   date
   function)
-
-(eval-when (:execute :compile-toplevel :load-toplevel)
-  (defmacro ss (&rest args)
-    `(split-sequence:split-sequence #\space ,@args))
-  (defmacro db (lambda-list expression &body body)
-    `(destructuring-bind ,lambda-list ,expression ,@body)))
 
 (progn
   (defun parse-cron-spec (line)
@@ -387,8 +395,4 @@
 ;; (defun schedule-task (time task)
 ;;   )
 
-(defmacro ^if (test if-true if-false)
-  `(let ((^it ,test))
-     (if ^it
-         ,if-true
-         ,if-false)))
+
