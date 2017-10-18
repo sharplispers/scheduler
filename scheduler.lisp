@@ -252,6 +252,9 @@
   ;; algorithm is based on
   ;; https://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time#3453872
   (defun compute-next-occurance (spec &optional (time (local-time:now)))
+    (local-time:adjust-timestamp! time
+      (set :nsec 0)
+      (set :sec 0))
     (flet ((next-fit (n set) (find-if (lambda (s) (< n s)) set))
            (first* (set default)
              (if (eql set :every)
@@ -339,8 +342,24 @@
   #+test
   (funcall
    (defun test-compute-next-occurance ()
-     (assert (null (ignore-errors
-                     (compute-next-occurance (parse-cron-entry "0 0 0 0 0 foo"))))))))
+     (let ((et (alexandria:curry #'local-time:encode-timestamp 0 0))) 
+       (assert (local-time:timestamp=
+                (compute-next-occurance (parse-cron-entry "0 0 1 1 0 foo"))
+                (funcall et 0 0 1 1 2023)))
+       (assert (local-time:timestamp=
+                (compute-next-occurance (parse-cron-entry "0 0 1 1 * foo")
+                                        (funcall et 1 0 1 1 2017))
+                (funcall et 0 0 1 1 2018)))
+       (assert (and (local-time:timestamp<=
+                     (funcall et 0 0 1 1 2018)
+                     (compute-next-occurance (parse-cron-entry "H H 1 1 * foo")
+                                             (funcall et 0 0 2 1 2017)))
+                    (local-time:timestamp>=
+                     (funcall et 59 23 1 1 2018)
+                     (compute-next-occurance (parse-cron-entry "H H 1 1 * foo")
+                                             (funcall et 0 0 2 1 2017)))))
+       (assert
+        (null (ignore-errors (compute-next-occurance (parse-cron-entry "0 0 0 0 0 foo")))))))))
 
 (defun next-occurance (entry)
   (when (local-time:timestamp>= (local-time:now)
