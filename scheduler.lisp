@@ -358,12 +358,12 @@
 ;;  (:random :from 0 :to 59 :step 15))
 
 
-(defun add-scheduler-task (&key
-                             (minute :every)
-                             (hour :every)
-                             (day-of-month :every)
-                             (month :every)
-                             (day-of-week :every)))
+;; (defun add-scheduler-task (&key
+;;                              (minute :every)
+;;                              (hour :every)
+;;                              (day-of-month :every)
+;;                              (month :every)
+;;                              (day-of-week :every)))
 
 
 ;; (defun add-scheduler-task (schedule-specs function))
