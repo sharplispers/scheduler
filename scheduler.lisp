@@ -371,11 +371,6 @@
         (null (ignore-errors (compute-next-occurance
                               (parse-cron-entry "0 0 0 0 0 foo")))))))))
 
-(defun missed-occurance (entry)
-  (when (local-time:timestamp>= (local-time:now)
-                                (scheduler-entry-next-occurance entry))
-    (warn "Missed occurance, scheduling somewhere soon!")))
-
 
 (defclass scheduler ()
   ((%state :initform :stopped :accessor scheduler-state)
@@ -419,12 +414,18 @@
 
 (defun start-scheduler (scheduler)
   (setf (scheduler-state scheduler) :running)
-  (flet ((run-valid-tasks (time/event-spec)
-           (dolist (task (list-scheduler-tasks scheduler))
-             (when (is-it-now? (time-specs task) time/event-spec)
-               (setf (last-occurance task) time/event-spec
-                     (next-occurance task) (compute-next-occurance time/event-spec))
-               (format *debug-io* "Executing ~s at ~s.~%" (command task) time/event-spec)))))
+  (labels ((missed-occurance (task)
+             (warn "~s was missed." task)
+             (let ((next (next-occurance task)))
+               (and (null (keywordp next))
+                    (local-time:timestamp>= (local-time:now) next))))
+           (run-valid-tasks (time/event-spec)
+             (dolist (task (list-scheduler-tasks scheduler))
+               (when (or (missed-occurance task)
+                         (is-it-now? (time-specs task) time/event-spec))
+                 (setf (last-occurance task) time/event-spec
+                       (next-occurance task) (compute-next-occurance time/event-spec))
+                 (format *debug-io* "Executing ~s at ~s.~%" (command task) time/event-spec)))))
     (run-valid-tasks :reboot)
     (loop while (eql (scheduler-state scheduler) :running)
        do (progn (run-valid-tasks (local-time:now))
