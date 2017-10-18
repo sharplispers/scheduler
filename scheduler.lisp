@@ -199,7 +199,7 @@
 (progn
   (defun parse-cron-entry (spec &aux (spec (parse-cron-spec spec)))
     (when (member (car spec) '(:reboot :shutdown))
-      (return-from parse-cron-entry (values (car spec) (cdr spec))))
+      (return-from parse-cron-entry (values `(:event ,(car spec)) (cdr spec))))
     (db ((minute hour day-of-month month day-of-week) . command) spec
       ;; XXX: seeding `*random-state*' with command ensures, that
       ;; randomness is stable. This is useful for parsing H entries.
@@ -236,15 +236,16 @@
     (or (eql :every spec)
         (member obj spec)))
 
-  (defun is-it-now? (spec &optional (starting-of (local-time:now)))
-    (db (&key minute hour day-of-month month day-of-week)
-        spec
-      (and
-       (match-spec (local-time:timestamp-day-of-week starting-of) day-of-week)
-       (match-spec (local-time:timestamp-month starting-of) month)
-       (match-spec (local-time:timestamp-day starting-of) day-of-month)
-       (match-spec (local-time:timestamp-hour starting-of) hour)
-       (match-spec (local-time:timestamp-minute starting-of) minute))))
+  (defun is-it-now? (spec &optional (current-time-or-event (local-time:now)))
+    (db (&key minute hour day-of-month month day-of-week event) spec
+      (or (eql current-time-or-event event)
+          (and
+           (typep current-time-or-event 'local-time:timestamp)
+           (match-spec (local-time:timestamp-day-of-week current-time-or-event) day-of-week)
+           (match-spec (local-time:timestamp-month current-time-or-event) month)
+           (match-spec (local-time:timestamp-day current-time-or-event) day-of-month)
+           (match-spec (local-time:timestamp-hour current-time-or-event) hour)
+           (match-spec (local-time:timestamp-minute current-time-or-event) minute)))))
 
   #+test
   (funcall
@@ -285,8 +286,8 @@
                         (next.day (local-time:timestamp-day time))
                         (next.month (local-time:timestamp-month time))
                         (next.year (local-time:timestamp-year time)))
-        (db (&key minute hour day-of-month month day-of-week)
-            spec
+        (db (&key minute hour day-of-month month day-of-week event) spec
+          (declare (ignore event))
           (loop
              do (block nil
                   ;; nudge minute
