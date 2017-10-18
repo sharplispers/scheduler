@@ -1,4 +1,3 @@
-
 (eval-when (:execute :compile-toplevel :load-toplevel)
   (asdf:load-systems 'alexandria
                      'split-sequence
@@ -144,7 +143,8 @@
          (let* ((to (parse-integer to))
                 (from (min to
                            (alexandria:random-elt
-                            (alexandria:iota step :start (parse-integer from))))))
+                            (alexandria:iota step
+                                             :start (parse-integer from))))))
            (every-nth* from to step)))
         ;; 1-14/3
         ((optima.ppcre:ppcre "([0-9]+)-([0-9]+)" from to)
@@ -160,7 +160,8 @@
       (let ((parse-result
              (if (null step)
                  (%parse-cron-time-1/no-step base range)
-                 (%parse-cron-time-1/step base range (parse-integer (car step))))))
+                 (%parse-cron-time-1/step base range
+                                          (parse-integer (car step))))))
         (assert (or (eql parse-result :every)
                     (every (lambda (n) (member n range)) parse-result))
                 nil "PARSE-CRON-TIME-1: Each element of ~s must be a member of:~%~s."
@@ -244,7 +245,8 @@
      (assert (is-it-now? (parse-cron-entry "* * * 4 * foo")
                          (local-time:encode-timestamp 0 14 12 8 15 4 2017)))
      (assert (null (is-it-now? (parse-cron-entry "* * * 4 * foo")
-                               (local-time:encode-timestamp 0 14 12 8 15 5 2017)))))))
+                               (local-time:encode-timestamp
+                                0 0 12 8 15 5 2017)))))))
 
 ;;; we assume here that all `:random' entries are already picked and
 ;;; if `:step' present already coerced to sets.
@@ -262,8 +264,9 @@
                  (first set)))
            (day-offset (now set default)
              (let ((day (local-time:timestamp-day now))
-                   (mday (local-time:days-in-month (local-time:timestamp-month now)
-                                                   (local-time:timestamp-year now)))
+                   (mday (local-time:days-in-month
+                          (local-time:timestamp-month now)
+                          (local-time:timestamp-year now)))
                    (target (if (eql set :every)
                                default
                                (first set))))
@@ -278,7 +281,8 @@
             spec
           (loop
              do (block nil
-                  (format *debug-io* "trying ~A~%" (local-time:format-timestring nil time))
+                  (format *debug-io* "trying ~A~%"
+                          (local-time:format-timestring nil time))
                   ;; nudge minute
                   (unless (match-spec next.minute minute)
                     (^if (next-fit next.minute minute)
@@ -342,7 +346,7 @@
   #+test
   (funcall
    (defun test-compute-next-occurance ()
-     (let ((et (alexandria:curry #'local-time:encode-timestamp 0 0))) 
+     (let ((et (alexandria:curry #'local-time:encode-timestamp 0 0)))
        (assert (local-time:timestamp=
                 (compute-next-occurance (parse-cron-entry "0 0 1 1 0 foo"))
                 (funcall et 0 0 1 1 2023)))
@@ -359,7 +363,8 @@
                      (compute-next-occurance (parse-cron-entry "H H 1 1 * foo")
                                              (funcall et 0 0 2 1 2017)))))
        (assert
-        (null (ignore-errors (compute-next-occurance (parse-cron-entry "0 0 0 0 0 foo")))))))))
+        (null (ignore-errors (compute-next-occurance
+                              (parse-cron-entry "0 0 0 0 0 foo")))))))))
 
 (defun next-occurance (entry)
   (when (local-time:timestamp>= (local-time:now)
