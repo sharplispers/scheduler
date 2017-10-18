@@ -200,7 +200,7 @@
   (defun parse-cron-entry (spec &aux (spec (parse-cron-spec spec)))
     (when (member (car spec) '(:reboot :shutdown))
       (return-from parse-cron-entry (values (car spec) (cdr spec))))
-    (destructuring-bind ((minute hour day-of-month month day-of-week) . command) spec
+    (db ((minute hour day-of-month month day-of-week) . command) spec
       ;; XXX: seeding `*random-state*' with command ensures, that
       ;; randomness is stable. This is useful for parsing H entries.
       (let ((*random-state* (seed-random-state (sxhash command))))
@@ -239,7 +239,7 @@
         (member obj spec)))
 
   (defun is-it-now? (spec &optional (starting-of (local-time:now)))
-    (destructuring-bind (&key minute hour day-of-month month day-of-week)
+    (db (&key minute hour day-of-month month day-of-week)
         spec
       (and
        (match-spec (local-time:timestamp-day-of-week starting-of) day-of-week)
@@ -287,7 +287,7 @@
                         (next.day (local-time:timestamp-day time))
                         (next.month (local-time:timestamp-month time))
                         (next.year (local-time:timestamp-year time)))
-        (destructuring-bind (&key minute hour day-of-month month day-of-week)
+        (db (&key minute hour day-of-month month day-of-week)
             spec
           (loop
              do (block nil
