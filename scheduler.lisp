@@ -215,7 +215,7 @@
   ;; https://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time#3453872
   (when (keywordp time) (return-from compute-next-occurance time))
   (local-time:adjust-timestamp! time
-    (set :nsec 0) (set :sec 0) (offset :minute 1))
+    (set :nsec 0) (set :sec (random 60)) (offset :minute 1))
   (flet ((match-spec (obj spec)
            (or (eql :every spec)
                (member obj spec)))
@@ -378,8 +378,7 @@
              (if (and (typep timespec 'local-time:timestamp)
                       (typep (next-occurance task) 'local-time:timestamp))
                  (local-time:timestamp= (next-occurance task)
-                                        (local-time:adjust-timestamp timespec
-                                          (set :nsec 0) (set :sec 0)))
+                                        (local-time:adjust-timestamp timespec (set :nsec 0)))
                  (eql (next-occurance task) timespec)))
 
            (run-valid-tasks (time/event-spec)
