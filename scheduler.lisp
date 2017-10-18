@@ -40,7 +40,12 @@
     `(let ((^it ,test))
        (if ^it
            ,if-true
-           ,if-false))))
+           ,if-false)))
+
+  (defun seed-random-state (seed)
+    "Returns a new random state seeded with `object'."
+    #+ecl(make-random-state seed)
+    #+sbcl(sb-ext:seed-random-state seed)))
 
 (defstruct scheduler-entry
   schedule-specs
@@ -191,21 +196,23 @@
 
 (progn
   (defun parse-cron-entry (spec &aux (spec (parse-cron-spec spec)))
-    (if (member (car spec) '(:reboot :shutdown))
-        (values (car spec) (cdr spec))
-        (destructuring-bind ((minute hour day-of-month month day-of-week) . command)
-            spec
-          (values
-           (list :minute (parse-cron-time-1 minute '#.(alexandria:iota 60))
-                 :hour (parse-cron-time-1 hour '#.(alexandria:iota 24))
-                 :day-of-month (if (char= (elt day-of-month 0) #\H)
-                                   (parse-cron-time-1 day-of-month '#.(alexandria:iota 28 :start 1))
-                                   (parse-cron-time-1 day-of-month '#.(alexandria:iota 31 :start 1)))
-                 :month (parse-cron-time-1 month '#.(alexandria:iota 12 :start 1))
-                 :day-of-week (if (string= day-of-week "7")
-                                  (parse-cron-time-1 "0" '#.(alexandria:iota 7))
-                                  (parse-cron-time-1 day-of-week '#.(alexandria:iota 7))))
-           command))))
+    (when (member (car spec) '(:reboot :shutdown))
+      (return-from parse-cron-entry (values (car spec) (cdr spec))))
+    (destructuring-bind ((minute hour day-of-month month day-of-week) . command) spec
+      ;; XXX: seeding `*random-state*' with command ensures, that
+      ;; randomness is stable. This is useful for parsing H entries.
+      (let ((*random-state* (seed-random-state (sxhash command))))
+        (values
+         (list :minute (parse-cron-time-1 minute '#.(alexandria:iota 60))
+               :hour (parse-cron-time-1 hour '#.(alexandria:iota 24))
+               :day-of-month (if (char= (elt day-of-month 0) #\H)
+                                 (parse-cron-time-1 day-of-month '#.(alexandria:iota 28 :start 1))
+                                 (parse-cron-time-1 day-of-month '#.(alexandria:iota 31 :start 1)))
+               :month (parse-cron-time-1 month '#.(alexandria:iota 12 :start 1))
+               :day-of-week (if (string= day-of-week "7")
+                                (parse-cron-time-1 "0" '#.(alexandria:iota 7))
+                                (parse-cron-time-1 day-of-week '#.(alexandria:iota 7))))
+         command))))
 
   ;; for now we only check, if correct entries doesn't signal
   ;; condition, so no assertions here.
@@ -220,7 +227,11 @@
      (parse-cron-entry "@midnight foo")
      (parse-cron-entry "@annually foo")
      (assert (null (ignore-errors (parse-cron-entry "0 0 0 0 0 foo"))))
-     (assert (equal (getf (parse-cron-entry "* * * * 0 foo") :day-of-week) '(0))))))
+     (assert (equal (getf (parse-cron-entry "* * * * 0 foo") :day-of-week) '(0)))
+     (assert (equal (parse-cron-entry "H H H H H foo")
+                    (parse-cron-entry "H H H H H foo")))
+     (assert (null (equal (parse-cron-entry "H H H H H foo")
+                          (parse-cron-entry "H H H H H bar")))))))
 
 
 (progn
