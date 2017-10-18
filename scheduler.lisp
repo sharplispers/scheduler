@@ -74,28 +74,28 @@
         (cons specs command))))
 
   #+test
-  (defun test-parse-cron-spec ()
-    (flet ((parse (str) (parse-cron-spec str)))
-      (assert (equalp (parse "@reboot (lambda () (list 1 2 3))")
-                      `(:reboot . "(lambda () (list 1 2 3))")))
-      (assert (equalp (parse "@shutdown (lambda () (list 1 2 3))")
-                      `(:shutdown . "(lambda () (list 1 2 3))")))
-      (assert (equalp (parse "@yearly command")
-                      `(("0" "0" "1" "1" "*") . "command")))
-      (assert (equalp (parse "@yearly command")
-                      (parse "@annually command")))
-      (assert (equalp (parse "@daily command")
-                      (parse "@midnight command")))
-      (assert (not (equalp (parse "@daily command!")
-                           (parse "@midnight command"))))
-      (assert (not (equalp (parse "@weekly command bar")
-                           (parse "@weekly command"))))
-      (assert (equalp (parse "1 0 1/2 * 1,2 command foo")
-                      `(("1" "0" "1/2" "*" "1,2") . "command foo")))
-      (assert (null (handler-case (parse "1 0 1/2")        (simple-error () nil))))
-      (assert (null (handler-case (parse "@yearly ")       (simple-error () nil))))
-      (assert (null (handler-case (parse "@foo 3 4 ")      (simple-error () nil))))
-      (assert (null (handler-case (parse "@foo 3 4 1 1 2") (simple-error () nil)))))))
+  (funcall
+   (defun test-parse-cron-spec ()
+     (assert (equalp (parse-cron-spec "@reboot (lambda () (list 1 2 3))")
+                     `(:reboot . "(lambda () (list 1 2 3))")))
+     (assert (equalp (parse-cron-spec "@shutdown (lambda () (list 1 2 3))")
+                     `(:shutdown . "(lambda () (list 1 2 3))")))
+     (assert (equalp (parse-cron-spec "@yearly command")
+                     `(("H" "H" "H" "H" "*") . "command")))
+     (assert (equalp (parse-cron-spec "@yearly command")
+                     (parse-cron-spec "@annually command")))
+     (assert (equalp (parse-cron-spec "@daily command")
+                     (parse-cron-spec "@midnight command")))
+     (assert (not (equalp (parse-cron-spec "@daily command!")
+                          (parse-cron-spec "@midnight command"))))
+     (assert (not (equalp (parse-cron-spec "@weekly command bar")
+                          (parse-cron-spec "@weekly command"))))
+     (assert (equalp (parse-cron-spec "1 0 1/2 * 1,2 command foo")
+                     `(("1" "0" "1/2" "*" "1,2") . "command foo")))
+     (assert (null (ignore-errors (parse-cron-spec "1 0 1/2"))))
+     (assert (null (ignore-errors (parse-cron-spec "@yearly "))))
+     (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 "))))
+     (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 1 1 2")))))))
 
 (progn
   (defun %parse-cron-time-1/no-step (spec range)
@@ -160,22 +160,25 @@
         parse-result)))
 
   #+test
-  (defun test-parse-cron-time-1 (&aux (range (alexandria:iota 30)))
-    (assert (equalp (parse-cron-time-1 "*" range) :every))
-    (assert (equalp (parse-cron-time-1 "*/2" '(1 2 3 4 5 6 7)) '(1 3 5 7)))
-    (assert (equalp (parse-cron-time-1 "*/3" '(1 2 3 4 5 6 7)) '(1 4 7)))
-    (assert (equalp (parse-cron-time-1 "18" range) '(18)))
-    (let ((result (parse-cron-time-1 "H/2" '(1 2 3 4 5 6 7))))
-      (assert (or (equalp result '(1 3 5 7))
-                  (equalp result '(2 4 6)))))
-    (let ((result (parse-cron-time-1 "H(8-12)/2" range)))
-      (assert (or (equalp result '(8 10 12)) (equalp result '(9 11)))))
-    (assert (member (parse-cron-time-1 "H(8-12)" range) (alexandria:iota 5 :start 8)))
-    (assert (null (handler-case (parse-cron-time-1 "H(1,2)" range) (error () nil))))
-    (assert (null (handler-case (parse-cron-time-1 "1,2,4/2" '(1 2 3 4)) (error () nil))))
-    (assert (null (handler-case (parse-cron-time-1 "18/2" range) (error () nil))))
-    ;; we let that pass (due to being lazy) "1/" === "1"
-    #+ (or) (assert (null (handler-case (parse-cron-time-1 "1/" range) (error () nil))))))
+  (funcall
+   (defun test-parse-cron-time-1 (&aux (range (alexandria:iota 30)))
+     (assert (equalp (parse-cron-time-1 "*" range) :every))
+     (assert (equalp (parse-cron-time-1 "*/2" '(1 2 3 4 5 6 7)) '(1 3 5 7)))
+     (assert (equalp (parse-cron-time-1 "*/3" '(1 2 3 4 5 6 7)) '(1 4 7)))
+     (assert (equalp (parse-cron-time-1 "18" range) '(18)))
+     (assert (equalp (parse-cron-time-1 "0" (alexandria:iota 7)) '(0)))
+     (let ((result (parse-cron-time-1 "H/2" '(1 2 3 4 5 6 7))))
+       (assert (or (equalp result '(1 3 5 7))
+                   (equalp result '(2 4 6)))))
+     (let ((result (parse-cron-time-1 "H(8-12)/2" range)))
+       (assert (or (equalp result '(8 10 12)) (equalp result '(9 11)))))
+     (assert (member (first (parse-cron-time-1 "H(8-12)" range))
+                     (alexandria:iota 5 :start 8)))
+     (assert (null (ignore-errors (parse-cron-time-1 "H(1,2)" range))))
+     (assert (null (ignore-errors (parse-cron-time-1 "1,2,4/2" '(1 2 3 4)))))
+     (assert (null (ignore-errors (parse-cron-time-1 "18/2" range))))
+     ;; we let that pass (due to being lazy) "1/" === "1"
+     #+ (or) (assert (null (handler-case (parse-cron-time-1 "1/" range) (error () nil)))))))
 
 (progn
   (defun parse-cron-entry (spec &aux (spec (parse-cron-spec spec)))
@@ -198,15 +201,17 @@
   ;; for now we only check, if correct entries doesn't signal
   ;; condition, so no assertions here.
   #+test
-  (defun test-parse-cron-entry ()
-    (parse-cron-entry "@reboot foo")
-    (parse-cron-entry "@shutdown foo")
-    (parse-cron-entry "@yearly foo")
-    (parse-cron-entry "@weekly foo")
-    (parse-cron-entry "@daily foo")
-    (parse-cron-entry "@midnight foo")
-    (parse-cron-entry "@annually foo")
-    (parse-cron-entry "0 0 0 0 0 foo")))
+  (funcall
+   (defun test-parse-cron-entry ()
+     (parse-cron-entry "@reboot foo")
+     (parse-cron-entry "@shutdown foo")
+     (parse-cron-entry "@yearly foo")
+     (parse-cron-entry "@weekly foo")
+     (parse-cron-entry "@daily foo")
+     (parse-cron-entry "@midnight foo")
+     (parse-cron-entry "@annually foo")
+     (assert (null (ignore-errors (parse-cron-entry "0 0 0 0 0 foo"))))
+     (assert (equal (getf (parse-cron-entry "* * * * 0 foo") :day-of-week) '(0))))))
 
 
 (progn
@@ -224,17 +229,20 @@
        (match-spec (local-time:timestamp-hour starting-of) hour)
        (match-spec (local-time:timestamp-minute starting-of) minute))))
 
-  (defun test-is-it-now? ()
-    (assert (is-it-now? (parse-cron-entry "* * * * * foo") (local-time:now)))
-    (assert (is-it-now? (parse-cron-entry "* * * 4 * foo")
-                        (local-time:encode-timestamp 0 14 12 8 15 4 2017)))
-    (assert (null (is-it-now? (parse-cron-entry "* * * 4 * foo")
-                              (local-time:encode-timestamp 0 14 12 8 15 5 2017))))))
+  #+test
+  (funcall
+   (defun test-is-it-now? ()
+     (assert (is-it-now? (parse-cron-entry "* * * * * foo") (local-time:now)))
+     (assert (is-it-now? (parse-cron-entry "* * * 4 * foo")
+                         (local-time:encode-timestamp 0 14 12 8 15 4 2017)))
+     (assert (null (is-it-now? (parse-cron-entry "* * * 4 * foo")
+                               (local-time:encode-timestamp 0 14 12 8 15 5 2017)))))))
 
 ;;; we assume here that all `:random' entries are already picked and
 ;;; if `:step' present already coerced to sets.
 (progn
-  ;; based on https://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time#3453872
+  ;; algorithm is based on
+  ;; https://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time#3453872
   (defun compute-next-occurance (spec &optional (time (local-time:now)))
     (flet ((next-fit (n set) (find-if (lambda (s) (< n s)) set))
            (first* (set default)
@@ -320,8 +328,11 @@
                     (return))
                   (return-from compute-next-occurance time)))))))
 
-  (defun test-compute-next-occurance ()
-    (compute-next-occurance (parse-cron-entry "0 0 0 0 0 foo"))))
+  #+test
+  (funcall
+   (defun test-compute-next-occurance ()
+     (assert (null (ignore-errors
+                     (compute-next-occurance (parse-cron-entry "0 0 0 0 0 foo"))))))))
 
 (defun next-occurance (entry)
   (when (local-time:timestamp>= (local-time:now)
