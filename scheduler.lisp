@@ -7,25 +7,38 @@
 
 (defpackage #:scheduler
   (:use)
-  (:export #:start-scheduler
+  (:export #:scheduler
+           #:in-memory-scheduler
+           #:start-scheduler
            #:stop-scheduler
            ;; CRUDL
            #:create-scheduler-task
            #:read-scheduler-task
            #:update-scheduler-task
            #:delete-scheduler-task
-           #:list-scheduler-tasks))
+           #:list-scheduler-tasks
+           ;; task readers
+           #:time-specs
+           #:command
+           #:last-occurance
+           #:next-occurance))
 
 (defpackage #:scheduler-implementation
   (:use #:cl #:alexandria)
   (:import-from #:scheduler
+                #:scheduler
+                #:in-memory-scheduler
                 #:start-scheduler
                 #:stop-scheduler
                 #:create-scheduler-task
                 #:read-scheduler-task
                 #:update-scheduler-task
                 #:delete-scheduler-task
-                #:list-scheduler-tasks))
+                #:list-scheduler-tasks
+                #:time-specs
+                #:command
+                #:last-occurance
+                #:next-occurance))
 (in-package #:scheduler-implementation)
 
 ;; utils
@@ -330,13 +343,18 @@
 
 (defclass scheduler ()
   ((%state :initform :stopped :accessor scheduler-state)
-   (%lock :initform (bt:make-recursive-lock "scheduler lock") :accessor scheduler-lock)))
+   (%lock :initform (bt:make-recursive-lock "scheduler lock") :accessor scheduler-lock))
+  (:documentation "Thread-safe abstract scheduler class."))
 
 (defclass scheduler-task ()
   ((time-specs :initarg :time-specs :accessor time-specs)
    (command :initarg :command :accessor command)
-   (last-occurance :initform nil :accessor last-occurance)
-   (next-occurance :initform nil :accessor next-occurance)))
+   (last-occurance :initform nil
+                   :reader last-occurance
+                   :accessor %last-occurance)
+   (next-occurance :initform nil
+                   :reader next-occurance
+                   :accessor %next-occurance)))
 
 (defgeneric create-scheduler-task (scheduler cron-entry)
   (:method :around ((scheduler scheduler) cron-entry)
@@ -350,9 +368,10 @@
            (bt:with-recursive-lock-held ((scheduler-lock scheduler))
              (call-next-method))))
 
-(defgeneric update-scheduler-task (scheduler task cron-entry)
-  (:method :around ((scheduler scheduler) task cron-entry)
-           (declare (ignore task cron-entry))
+(defgeneric update-scheduler-task
+    (scheduler task &key cron-entry start-at &allow-other-keys)
+  (:method :around ((scheduler scheduler) task &key)
+           (declare (ignore task))
            (bt:with-recursive-lock-held ((scheduler-lock scheduler))
              (call-next-method))))
 
@@ -386,29 +405,31 @@
            (run-valid-tasks (time/event-spec)
              (dolist (task (list-scheduler-tasks scheduler))
                (unless (next-occurance task)
-                 (setf (next-occurance task)
-                       (compute-next-occurance (time-specs task) (local-time:now))))
+                 (update-scheduler-task scheduler task
+                                        :start-at (compute-next-occurance
+                                                   (time-specs task)
+                                                   (local-time:now))))
                (cond
-                 ((active-task? task time/event-spec)
-                  (format *debug-io* "~&Executing ~s at ~s.~%" (command task) time/event-spec)
-                  (eval (read-from-string (command task)))
-                  (setf (last-occurance task) time/event-spec
-                        (next-occurance task) (compute-next-occurance (time-specs task))))
                  ((missed-task? task)
-                  (format *debug-io* "~&Executing missed ~s at ~s (~s).~%"
-                          (command task) time/event-spec (next-occurance task))
                   (eval (read-from-string (command task) ))
-                  (setf (last-occurance task) time/event-spec
-                        (next-occurance task) (compute-next-occurance (time-specs task))))))))
+                  (update-scheduler-task scheduler task
+                                         :last-run time/event-spec
+                                         :start-at (compute-next-occurance
+                                                    (time-specs task)
+                                                    (local-time:now))))
+                 ((active-task? task time/event-spec)
+                  (eval (read-from-string (command task)))
+                  (update-scheduler-task scheduler task
+                                         :last-run time/event-spec
+                                         :start-at (compute-next-occurance
+                                                    (time-specs task)
+                                                    (local-time:now))))))))
 
     (run-valid-tasks :reboot)
     (loop while (eql (scheduler-state scheduler) :running)
-       do (progn (run-valid-tasks (local-time:now))
-                 (format *debug-io* ".")
-                 (finish-output *debug-io*)
-                 (sleep 1)))
+       do (progn (run-valid-tasks (local-time:now)) (sleep 1)))
     (run-valid-tasks :shutdown))
-  (format *debug-io* "~&Exitting scheduler.~%")
+  (format *debug-io* "~&Exiting scheduler.~%")
   (setf (scheduler-state scheduler) :stopped))
 
 (defun stop-scheduler (scheduler)
@@ -431,11 +452,15 @@
   (find task (list-scheduler-tasks scheduler)))
 
 (defmethod update-scheduler-task
-    ((scheduler in-memory-scheduler) (task scheduler-task) cron-entry)
+    ((scheduler in-memory-scheduler) (task scheduler-task)
+     &key (cron-entry nil ce-p) (last-run nil lr-p) (start-at nil at-p))
   (assert (find task (list-scheduler-tasks scheduler)))
-  (mvb (time-specs command) (parse-cron-entry cron-entry)
-    (setf (time-specs task) time-specs
-          (command task) command))
+  (when ce-p
+    (mvb (time-specs command) (parse-cron-entry cron-entry)
+      (setf (time-specs task) time-specs
+            (command task) command)))
+  (when at-p (setf (%next-occurance task) start-at))
+  (when lr-p (setf (%last-occurance task) last-run))
   task)
 
 (defmethod delete-scheduler-task
