@@ -430,6 +430,15 @@
 
            (run-valid-tasks (time/event-spec)
              (dolist (task (list-scheduler-tasks scheduler))
+               (unless (next-occurance task)
+                 ;; INV: compute-next-occurance offsets minute +1 so
+                 ;; we don't loop over the same time for each
+                 ;; second. Here we reverse that, because it is the
+                 ;; first computation.
+                 (setf (next-occurance task) (compute-next-occurance
+                                              (time-specs task)
+                                              (local-time:adjust-timestamp (local-time:now)
+                                                (offset :minute -1)))))
                (when (or (missed-task? task)
                          (active-task? task time/event-spec))
                  (setf (last-occurance task) time/event-spec
