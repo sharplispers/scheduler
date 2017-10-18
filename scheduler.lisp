@@ -421,10 +421,10 @@
 (defmethod create-scheduler-task
     ((scheduler in-memory-scheduler) cron-entry)
   (mvb (time-specs command) (parse-cron-entry cron-entry)
-    (push (make-instance 'scheduler-task
-                         :time-specs time-specs
-                         :command command)
-          (list-scheduler-tasks scheduler))))
+    (car (push (make-instance 'scheduler-task
+                              :time-specs time-specs
+                              :command command)
+               (list-scheduler-tasks scheduler)))))
 
 (defmethod read-scheduler-task
     ((scheduler in-memory-scheduler) (task scheduler-task))
