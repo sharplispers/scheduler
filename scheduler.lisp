@@ -369,6 +369,7 @@
   (:documentation "Lists all tasks registered with the scheduler."))
 
 (defun start-scheduler (scheduler)
+  (format *debug-io* "~&Starting scheduler.~%")
   (setf (scheduler-state scheduler) :running)
   (labels ((missed-task? (task)
              (and (typep (next-occurance task) 'local-time:timestamp)
@@ -385,25 +386,26 @@
            (run-valid-tasks (time/event-spec)
              (dolist (task (list-scheduler-tasks scheduler))
                (unless (next-occurance task)
-                 ;; INV: compute-next-occurance offsets minute +1 so
-                 ;; we don't loop over the same time for each
-                 ;; second. Here we reverse that, because it is the
-                 ;; first computation.
-                 (setf (next-occurance task) (compute-next-occurance
-                                              (time-specs task)
-                                              (local-time:adjust-timestamp (local-time:now)
-                                                (offset :minute -1)))))
-               (when (or (missed-task? task)
-                         (active-task? task time/event-spec))
-                 (setf (last-occurance task) time/event-spec
-                       (next-occurance task) (compute-next-occurance (time-specs task)))
-                 (format *debug-io* "~&Executing ~s at ~s.~%" (command task) time/event-spec)))))
+                 (setf (next-occurance task)
+                       (compute-next-occurance (time-specs task) (local-time:now))))
+               (cond
+                 ((active-task? task time/event-spec)
+                  (format *debug-io* "~&Executing ~s at ~s.~%" (command task) time/event-spec)
+                  (eval (read-from-string (command task)))
+                  (setf (last-occurance task) time/event-spec
+                        (next-occurance task) (compute-next-occurance (time-specs task))))
+                 ((missed-task? task)
+                  (format *debug-io* "~&Executing missed ~s at ~s (~s).~%"
+                          (command task) time/event-spec (next-occurance task))
+                  (eval (read-from-string (command task) ))
+                  (setf (last-occurance task) time/event-spec
+                        (next-occurance task) (compute-next-occurance (time-specs task))))))))
 
     (run-valid-tasks :reboot)
     (loop while (eql (scheduler-state scheduler) :running)
        do (progn (run-valid-tasks (local-time:now))
-                 (format *debug-io* ".")
-                 (finish-output *debug-io*)
+                 ;; (format *debug-io* ".")
+                 ;; (finish-output *debug-io*)
                  (sleep 1)))
     (run-valid-tasks :shutdown))
   (format *debug-io* "~&Exitting scheduler.~%")
