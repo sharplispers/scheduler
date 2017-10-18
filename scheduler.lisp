@@ -36,6 +36,9 @@
   (defmacro db (lambda-list expression &body body)
     `(destructuring-bind ,lambda-list ,expression ,@body))
 
+  (defmacro mvb (lambda-list expression &body body)
+    `(multiple-value-bind ,lambda-list ,expression ,@body))
+
   (defmacro ^if (test if-true if-false)
     `(let ((^it ,test))
        (if ^it
