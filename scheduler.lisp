@@ -486,6 +486,7 @@
     ((scheduler in-memory-scheduler) (task scheduler-task))
   (setf (list-scheduler-tasks scheduler) (delete task (list-scheduler-tasks scheduler))))
 
+#+test
 (funcall
  (defun test-in-memory-scheduler ()
    (let ((scheduler (make-instance 'in-memory-scheduler)))
