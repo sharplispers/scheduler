@@ -112,7 +112,7 @@
        (let* ((from (parse-integer from))
               (to (parse-integer to))
               (size (1+ (- to from))))
-         (alexandria:random-elt (alexandria:iota size :start from))))
+         (list (alexandria:random-elt (alexandria:iota size :start from)))))
       ;; 1-12
       ((optima.ppcre:ppcre "([0-9]+)-([0-9]+)" from to)
        (alexandria:iota (1+ (- to from)) :start from))))
@@ -156,7 +156,8 @@
         (assert (or (eql parse-result :every)
                     (every (lambda (n) (member n range)) parse-result))
                 nil "PARSE-CRON-TIME-1: Each element of ~s must be a member of:~%~s."
-                parse-result (cons :every range)))))
+                parse-result (cons :every range))
+        parse-result)))
 
   #+test
   (defun test-parse-cron-time-1 (&aux (range (alexandria:iota 30)))
