@@ -1,3 +1,5 @@
+;;; Copyright (c) 2017, Emergent Network Defense <http://endsecurity.com/>
+
 (defpackage #:scheduler
   (:use)
   (:export #:scheduler
