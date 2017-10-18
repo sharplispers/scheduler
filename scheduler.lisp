@@ -167,6 +167,7 @@
    (assert (equalp (parse-cron-time-1 "*/3" '(1 2 3 4 5 6 7)) '(1 4 7)))
    (assert (equalp (parse-cron-time-1 "18" range) '(18)))
    (assert (equalp (parse-cron-time-1 "0" (alexandria:iota 7)) '(0)))
+   (assert (equalp (parse-cron-time-1 "2-6" '#.(alexandria:iota 7)) '(2 3 4 5 6)))
    (let ((result (parse-cron-time-1 "H/2" '(1 2 3 4 5 6 7))))
      (assert (or (equalp result '(1 3 5 7))
                  (equalp result '(2 4 6)))))
