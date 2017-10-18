@@ -255,7 +255,11 @@
                          (local-time:encode-timestamp 0 14 12 8 15 4 2017)))
      (assert (null (is-it-now? (parse-cron-entry "* * * 4 * foo")
                                (local-time:encode-timestamp
-                                0 0 12 8 15 5 2017)))))))
+                                0 0 12 8 15 5 2017))))
+     (assert (is-it-now? (parse-cron-entry "@reboot foo") :reboot))
+     (assert (is-it-now? (parse-cron-entry "@shutdown foo") :shutdown))
+     (assert (null (is-it-now? (parse-cron-entry "@reboot foo") :shutdown)))
+     (assert (null (is-it-now? (parse-cron-entry "@shutdown foo") :reboot))))))
 
 ;;; we assume here that all `:random' entries are already picked and
 ;;; if `:step' present already coerced to sets.
