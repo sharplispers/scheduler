@@ -45,7 +45,8 @@
   (defun seed-random-state (seed)
     "Returns a new random state seeded with `object'."
     #+ecl(make-random-state seed)
-    #+sbcl(sb-ext:seed-random-state seed)))
+    #+sbcl(sb-ext:seed-random-state seed)
+    #-(or ecl sbcl) (make-random-state #.(make-random-state *random-state*))))
 
 (defstruct scheduler-entry
   schedule-specs
@@ -231,7 +232,6 @@
      (assert (null (equal (parse-cron-entry "H H H H H foo")
                           (parse-cron-entry "H H H H H bar")))))))
 
-
 (progn
   (defun match-spec (obj spec)
     (or (eql :every spec)
