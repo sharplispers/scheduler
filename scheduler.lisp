@@ -506,12 +506,3 @@
 ;; ;; Starts on: [date]
 ;; ;; Ends: [never], after [n] occurances, on [date]
 ;; ;; Summary: Weekly on Sunday
-
-;; (defun scheduler-loop ()
-;;   )
-
-
-;; (defun schedule-task (time task)
-;;   )
-
-
