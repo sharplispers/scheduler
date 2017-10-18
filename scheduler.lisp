@@ -44,6 +44,7 @@
 
   (defun seed-random-state (seed)
     "Returns a new random state seeded with `object'."
+    #-(or ecl sbcl) (declare (ignore seed))
     #+ecl(make-random-state seed)
     #+sbcl(sb-ext:seed-random-state seed)
     #-(or ecl sbcl) (make-random-state #.(make-random-state *random-state*))))
