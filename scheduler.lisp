@@ -416,8 +416,9 @@
 (defun start-scheduler (scheduler)
   (setf (scheduler-state scheduler) :running)
   (labels ((missed-task? (task)
-             (local-time:timestamp>= (local-time:now)
-                                     (next-occurance task)))
+             (and (typep (next-occurance task) 'local-time:timestamp)
+                  (local-time:timestamp>= (local-time:now)
+                                          (next-occurance task))))
 
            (active-task? (task timespec)
              (if (typep timespec 'local-time:timestamp)
