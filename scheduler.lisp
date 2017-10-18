@@ -437,6 +437,34 @@
 (defun stop-scheduler (scheduler)
   (setf (scheduler-state scheduler) :exit))
 
+
+(defclass in-memory-scheduler (scheduler)
+  ((tasks :initform nil :accessor list-scheduler-tasks)))
+
+(defmethod create-scheduler-task
+    ((scheduler in-memory-scheduler) cron-entry)
+  (mvb (time-specs command) (parse-cron-entry cron-entry)
+    (push (make-instance 'scheduler-task
+                         :time-specs time-specs
+                         :command command)
+          (list-scheduler-tasks scheduler))))
+
+(defmethod read-scheduler-task
+    ((scheduler in-memory-scheduler) (task scheduler-task))
+  (find task (list-scheduler-tasks scheduler)))
+
+(defmethod update-scheduler-task
+    ((scheduler in-memory-scheduler) (task scheduler-task) cron-entry)
+  (assert (find task (list-scheduler-tasks scheduler)))
+  (mvb (time-specs command) (parse-cron-entry cron-entry)
+    (setf (time-specs task) time-specs
+          (command task) command))
+  task)
+
+(defmethod delete-scheduler-task
+    ((scheduler in-memory-scheduler) (task scheduler-task))
+  (setf (list-scheduler-tasks scheduler) (delete task (list-scheduler-tasks scheduler))))
+
 ;; (list
 ;;  :every
 ;;  (:every :step 2)
