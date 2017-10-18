@@ -371,7 +371,7 @@
         (null (ignore-errors (compute-next-occurance
                               (parse-cron-entry "0 0 0 0 0 foo")))))))))
 
-(defun next-occurance (entry)
+(defun missed-occurance (entry)
   (when (local-time:timestamp>= (local-time:now)
                                 (scheduler-entry-next-occurance entry))
     (warn "Missed occurance, scheduling somewhere soon!")))
