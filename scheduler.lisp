@@ -97,8 +97,6 @@
   (optima:ematch spec
     ("*" :every)
     ("H" (list (alexandria:random-elt range)))
-    ((optima.ppcre:ppcre "(^[0-9]+)" number)
-     (list (parse-integer number)))
     ;; 1,2,4,8
     ((optima.ppcre:ppcre "^[0-9]+,.*")
      (mapcar #'parse-integer (ppcre:split "," spec)))
@@ -110,7 +108,12 @@
        (list (alexandria:random-elt (alexandria:iota size :start from)))))
     ;; 1-12
     ((optima.ppcre:ppcre "([0-9]+)-([0-9]+)" from to)
-     (alexandria:iota (1+ (- to from)) :start from))))
+     (let* ((from (parse-integer from))
+            (to (parse-integer to))
+            (size (1+ (- to from))))
+       (alexandria:iota size :start from)))
+    ((optima.ppcre:ppcre "(^[0-9]+)" number)
+     (list (parse-integer number)))))
 
 (defun %parse-cron-time-1/step (spec range step)
   (flet ((every-nth (list step)
