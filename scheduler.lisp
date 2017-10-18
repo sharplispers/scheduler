@@ -259,6 +259,7 @@
   ;; algorithm is based on
   ;; https://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time#3453872
   (defun compute-next-occurance (spec &optional (time (local-time:now)))
+    (when (keywordp time) (return-from compute-next-occurance time))
     (local-time:adjust-timestamp! time
       (set :nsec 0)
       (set :sec 0))
