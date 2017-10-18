@@ -1,10 +1,3 @@
-(eval-when (:execute :compile-toplevel :load-toplevel)
-  (asdf:load-systems 'alexandria
-                     'split-sequence
-                     'local-time
-                     'optima
-                     'optima.ppcre))
-
 (defpackage #:scheduler
   (:use)
   (:export #:scheduler
