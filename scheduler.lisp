@@ -262,7 +262,8 @@
     (when (keywordp time) (return-from compute-next-occurance time))
     (local-time:adjust-timestamp! time
       (set :nsec 0)
-      (set :sec 0))
+      (set :sec 0)
+      (offset :minute 1))
     (flet ((next-fit (n set) (find-if (lambda (s) (< n s)) set))
            (first* (set default)
              (if (eql set :every)
