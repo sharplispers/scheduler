@@ -426,7 +426,7 @@
                  (local-time:timestamp= (next-occurance task)
                                         (local-time:adjust-timestamp timespec
                                           (set :nsec 0) (set :sec 0)))
-                 (eql (time-specs task) timespec)))
+                 (eql (next-occurance task) timespec)))
 
            (run-valid-tasks (time/event-spec)
              (dolist (task (list-scheduler-tasks scheduler))
