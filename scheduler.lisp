@@ -286,7 +286,7 @@
                         (next.month (local-time:timestamp-month time))
                         (next.year (local-time:timestamp-year time)))
         (db (&key minute hour day-of-month month day-of-week event) spec
-          (declare (ignore event))
+          (when event (return-from compute-next-occurance event))
           (loop
              do (block nil
                   ;; nudge minute
