@@ -383,6 +383,12 @@
    (last-occurance :initform nil :accessor last-occurance)
    (next-occurance :initform nil :accessor next-occurance)))
 
+(defmethod initialize-instance :after ((task scheduler-task) &key)
+  (setf (next-occurance task) (compute-next-occurance
+                               (time-specs task)
+                               (local-time:adjust-timestamp (local-time:now)
+                                 (offset :minute -1)))))
+
 (defgeneric create-scheduler-task (scheduler cron-entry)
   (:method :around ((scheduler scheduler) cron-entry)
            (declare (ignore cron-entry))
