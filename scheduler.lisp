@@ -443,18 +443,27 @@
   (setf (list-scheduler-tasks scheduler) (delete task (list-scheduler-tasks scheduler))))
 
 #+test
-(funcall
- (defun test-in-memory-scheduler ()
-   (let ((scheduler (make-instance 'in-memory-scheduler)))
-     (create-scheduler-task scheduler "@reboot xxx")
-     (create-scheduler-task scheduler "@shutdown yyy")
-     (create-scheduler-task scheduler "H/2 * * * * foobar")
-     (create-scheduler-task scheduler "* * * * * barbar")
-     (create-scheduler-task scheduler "H/3 * * * * quxbar")
-     (bt:make-thread (lambda () (start-scheduler scheduler)))
-     (bt:make-thread (lambda ()
-                       (sleep 120)
-                       (stop-scheduler scheduler))))))
+(let (foobar xxx yyy)
+  (defun %foobar () (incf foobar))
+  (defun %xxx () (incf xxx))
+  (defun %yyy () (incf yyy))
+  (defun test-in-memory-scheduler ()
+    (setf foobar 0
+          xxx 0
+          yyy 0)
+    (let ((scheduler (make-instance 'in-memory-scheduler)))
+      (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
+      (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")
+      (create-scheduler-task scheduler "H/2 * * * * (scheduler-implementation::%foobar)")
+      (create-scheduler-task scheduler "* * * * * (scheduler-implementation::%foobar)")
+      (create-scheduler-task scheduler "H/3 * * * * (scheduler-implementation::%foobar)")
+      (let ((thread (bt:make-thread (lambda () (start-scheduler scheduler)))))
+        (sleep 100)
+        (stop-scheduler scheduler)
+        (bt:join-thread thread))
+      (assert (= xxx 1))
+      (assert (= yyy 1))
+      (assert (> foobar 2)))))
 
 
 ;; (list
