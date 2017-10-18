@@ -52,17 +52,6 @@
     #+sbcl(sb-ext:seed-random-state seed)
     #-(or ecl sbcl) (make-random-state #.(make-random-state *random-state*))))
 
-(defstruct scheduler-entry
-  schedule-specs
-  last-occurance
-  next-occurance
-  trigger-function)
-
-(defstruct scheduler-task
-  (status :scheduled)
-  date
-  function)
-
 (progn
   (defun parse-cron-spec (line)
     (flet ((split-at ()
