@@ -477,12 +477,12 @@
        (create-scheduler-task scheduler "* * * * * (scheduler-implementation::%foobar)")
        (create-scheduler-task scheduler "H/3 * * * * (scheduler-implementation::%foobar)")
        (let ((thread (bt:make-thread (lambda () (start-scheduler scheduler)))))
-         (sleep 100)
+         (sleep 180)
          (stop-scheduler scheduler)
          (bt:join-thread thread))
        (assert (= xxx 1))
        (assert (= yyy 1))
-       (assert (> foobar 2))))))
+       (assert (>= foobar 3))))))
 
 
 ;; (list
