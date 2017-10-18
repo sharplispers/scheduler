@@ -1,7 +1,7 @@
 
 (in-package #:asdf-user)
 
-(defsystem scheduler
+(defsystem #:scheduler
   :author "Daniel Kochmański <daniel@turtleware.eu>"
   :license "BSD-2-Clause"
   :description "Extensible task scheduler."
