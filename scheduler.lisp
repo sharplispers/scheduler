@@ -228,10 +228,8 @@
      (parse-cron-entry "@annually foo")
      (assert (null (ignore-errors (parse-cron-entry "0 0 0 0 0 foo"))))
      (assert (equal (getf (parse-cron-entry "* * * * 0 foo") :day-of-week) '(0)))
-     (assert (equal (parse-cron-entry "H H H H H foo")
-                    (parse-cron-entry "H H H H H foo")))
-     (assert (null (equal (parse-cron-entry "H H H H H foo")
-                          (parse-cron-entry "H H H H H bar")))))))
+     (assert (equal #1=(parse-cron-entry "H H H H H foo") #1#))
+     (assert (null (equal (parse-cron-entry "H H H H H bar") #1#))))))
 
 (progn
   (defun match-spec (obj spec)
@@ -291,8 +289,6 @@
             spec
           (loop
              do (block nil
-                  (format *debug-io* "trying ~A~%"
-                          (local-time:format-timestring nil time))
                   ;; nudge minute
                   (unless (match-spec next.minute minute)
                     (^if (next-fit next.minute minute)
