@@ -306,22 +306,23 @@
 #+test
 (funcall
  (defun test-compute-next-occurance ()
-   (let ((et (alexandria:curry #'local-time:encode-timestamp 0 0)))
+   (flet ((et (&rest args) (apply #'local-time:encode-timestamp 0 0 args))
+          (st (time) (local-time:adjust-timestamp time (set :sec 0))))
      (assert (local-time:timestamp=
-              (compute-next-occurance (parse-cron-entry "0 0 1 1 0 foo"))
-              (funcall et 0 0 1 1 2023)))
+              (st (compute-next-occurance (parse-cron-entry "0 0 1 1 0 foo")))
+              (et 0 0 1 1 2023)))
      (assert (local-time:timestamp=
-              (compute-next-occurance (parse-cron-entry "0 0 1 1 * foo")
-                                      (funcall et 1 0 1 1 2017))
-              (funcall et 0 0 1 1 2018)))
+              (st (compute-next-occurance
+                   (parse-cron-entry "0 0 1 1 * foo") (et 1 0 1 1 2017)))
+              (et 0 0 1 1 2018)))
      (assert (and (local-time:timestamp<=
-                   (funcall et 0 0 1 1 2018)
-                   (compute-next-occurance (parse-cron-entry "H H 1 1 * foo")
-                                           (funcall et 0 0 2 1 2017)))
+                   (et 0 0 1 1 2018)
+                   (st (compute-next-occurance
+                        (parse-cron-entry "H H 1 1 * foo") (et 0 0 2 1 2017))))
                   (local-time:timestamp>=
-                   (funcall et 59 23 1 1 2018)
-                   (compute-next-occurance (parse-cron-entry "H H 1 1 * foo")
-                                           (funcall et 0 0 2 1 2017)))))
+                   (et 59 23 1 1 2018)
+                   (st (compute-next-occurance
+                        (parse-cron-entry "H H 1 1 * foo") (et 0 0 2 1 2017))))))
      (assert
       (null (ignore-errors (compute-next-occurance
                             (parse-cron-entry "0 0 0 0 0 foo"))))))))
