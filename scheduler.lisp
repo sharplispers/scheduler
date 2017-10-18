@@ -486,6 +486,19 @@
     ((scheduler in-memory-scheduler) (task scheduler-task))
   (setf (list-scheduler-tasks scheduler) (delete task (list-scheduler-tasks scheduler))))
 
+(funcall
+ (defun test-in-memory-scheduler ()
+   (let ((scheduler (make-instance 'in-memory-scheduler)))
+     (create-scheduler-task scheduler "@reboot xxx")
+     (create-scheduler-task scheduler "@shutdown yyy")
+     (create-scheduler-task scheduler "H/2 * * * * foobar")
+     (create-scheduler-task scheduler "* * * * * barbar")
+     (create-scheduler-task scheduler "H/3 * * * * quxbar")
+     (bt:make-thread (lambda () (start-scheduler scheduler)))
+     (bt:make-thread (lambda ()
+                       (sleep 120)
+                       (stop-scheduler scheduler))))))
+
 ;; (list
 ;;  :every
 ;;  (:every :step 2)
