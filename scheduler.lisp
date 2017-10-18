@@ -214,8 +214,6 @@
                                 (parse-cron-time-1 day-of-week '#.(alexandria:iota 7))))
          command))))
 
-  ;; for now we only check, if correct entries doesn't signal
-  ;; condition, so no assertions here.
   #+test
   (funcall
    (defun test-parse-cron-entry ()
