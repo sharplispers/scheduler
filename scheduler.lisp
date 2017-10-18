@@ -421,7 +421,8 @@
                                           (next-occurance task))))
 
            (active-task? (task timespec)
-             (if (typep timespec 'local-time:timestamp)
+             (if (and (typep timespec 'local-time:timestamp)
+                      (typep (next-occurance task) 'local-time:timestamp))
                  (local-time:timestamp= (next-occurance task)
                                         (local-time:adjust-timestamp timespec
                                           (set :nsec 0) (set :sec 0)))
