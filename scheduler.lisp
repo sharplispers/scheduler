@@ -376,6 +376,67 @@
                                 (scheduler-entry-next-occurance entry))
     (warn "Missed occurance, scheduling somewhere soon!")))
 
+
+(defclass scheduler ()
+  ((%state :initform :stopped :accessor scheduler-state)
+   (%lock :initform (bt:make-recursive-lock "scheduler lock") :accessor scheduler-lock)))
+
+(defclass scheduler-task ()
+  ((time-specs :initarg :time-specs :accessor time-specs)
+   (command :initarg :command :accessor command)
+   (last-occurance :initform nil :accessor last-occurance)
+   (next-occurance :initform nil :accessor next-occurance)))
+
+(defgeneric create-scheduler-task (scheduler cron-entry)
+  (:method :around ((scheduler scheduler) cron-entry)
+           (declare (ignore cron-entry))
+           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+             (call-next-method))))
+
+(defgeneric read-scheduler-task (scheduler task)
+  (:method :around ((scheduler scheduler) task)
+           (declare (ignore task))
+           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+             (call-next-method))))
+
+(defgeneric update-scheduler-task (scheduler task cron-entry)
+  (:method :around ((scheduler scheduler) task cron-entry)
+           (declare (ignore task cron-entry))
+           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+             (call-next-method))))
+
+(defgeneric delete-scheduler-task (scheduler task)
+  (:method :around ((scheduler scheduler) task)
+           (declare (ignore task))
+           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+             (call-next-method))))
+
+(defgeneric list-scheduler-tasks (scheduler)
+  (:method :around ((scheduler scheduler))
+           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+             (call-next-method)))
+  (:documentation "Lists all tasks registered with the scheduler."))
+
+(defun start-scheduler (scheduler)
+  (setf (scheduler-state scheduler) :running)
+  (flet ((run-valid-tasks (time/event-spec)
+           (dolist (task (list-scheduler-tasks scheduler))
+             (when (is-it-now? (time-specs task) time/event-spec)
+               (setf (last-occurance task) time/event-spec
+                     (next-occurance task) (compute-next-occurance time/event-spec))
+               (format *debug-io* "Executing ~s at ~s.~%" (command task) time/event-spec)))))
+    (run-valid-tasks :reboot)
+    (loop while (eql (scheduler-state scheduler) :running)
+       do (progn (run-valid-tasks (local-time:now))
+                 (format *debug-io* "Waiting 1 second.~%")
+                 (sleep 1)))
+    (run-valid-tasks :shutdown))
+  (format *debug-io* "Exitting scheduler.~%")
+  (setf (scheduler-state scheduler) :stopped))
+
+(defun stop-scheduler (scheduler)
+  (setf (scheduler-state scheduler) :exit))
+
 ;; (list
 ;;  :every
 ;;  (:every :step 2)
