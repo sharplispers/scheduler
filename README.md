@@ -65,7 +65,10 @@ task is to stop the scheduler in the first or in the second minute
 > (scheduler:create-scheduler-task *scheduler* "*/2 * * * * (scheduler:stop-scheduler *scheduler*)")
 ```
 
-Listing tasks is very easy. Same goes for starting the scheduler loop:
+Important note regarding the last task. It assumes, that
+`start-scheduler` is run in the same package as `*scheduler*` is
+defined. Listing tasks is also very easy. Same goes for starting the
+scheduler loop:
 
 ```
 > (scheduler:list-scheduler-tasks *scheduler*)
