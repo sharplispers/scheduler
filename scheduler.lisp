@@ -223,11 +223,12 @@
      (assert (equal #1=(parse-cron-entry "H H H H H foo") #1#))
      (assert (null (equal (parse-cron-entry "H H H H H bar") #1#))))))
 
-(progn
-  (defun match-spec (obj spec)
-    (or (eql :every spec)
-        (member obj spec)))
+(defun match-spec (obj spec)
+  (or (eql :every spec)
+      (member obj spec)))
 
+#+(or) ; not used
+(progn
   (defun is-it-now? (spec &optional (current-time-or-event (local-time:now)))
     (db (&key minute hour day-of-month month day-of-week event) spec
       (or (eql current-time-or-event event)
