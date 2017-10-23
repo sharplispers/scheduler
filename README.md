@@ -153,12 +153,46 @@ scheduler, but rather call this function asynchronously.
 
 This is extensible software. Scheduler is arranged around a simple
 protocol based on CRUD(L) principle. Reference implementation
-`in-memory-scheduler` is provided for conveniance and testing. More
-advanced backends may be written by subclassing `scheduler` class and
-implementing methods `create-scheduler-task`, `read-scheduler-task`,
+`in-memory-scheduler` is provided for conveniance and testing.
+
+More advanced backends may be written by subclassing `scheduler` class
+for task storage. Optionally `scheduler-task` may be subclassed to
+extend tasks.
+
+Each scheduler must have implemented the following methods:
+`create-scheduler-task`, `read-scheduler-task`,
 `update-scheduler-task`, `delete-scheduler-task` and
 `list-scheduler-tasks`. Methods implementation should be fairly
 straightforward.
+
+Each task must obey the protocol based on the following methods:
+`last-occurance`, `next-occurance`, `time-specs` and
+`command`. Methods `create-scheduler-task` and `update-scheduler-task`
+must be aware of the `scheduler-task` implementation to be able to
+manipulate its internal structure.
+
+`last-occurance` and `next-occurance` should be set on
+`update-scheduler-task` invocation according to key parameters
+`last-run` and `start-at` (when present). Format of these dates is an
+instance of `local-time:timestamp` and that's what these methods
+should return.
+
+`time-spec` is a property list, which stores occurance time
+specification. It may be a symbol indicating some supported event,
+like `:reboot` and `:shootdown` or a property list.
+
+Property list must have keys `:minute` `:hour` `:day-of-month`
+`:month` `day-of-week`, which values are lists with integer values
+when task should be repeated, or a keyword `:every`. For example:
+
+    (list :minute (30)
+          :hour (1)
+          :day-of-month (7 14)
+          :month :every
+          :day-of-week :every)
+
+Command is a string, which will be read and evaluated each time the
+task is executed.
 
 ## Reference manual
 
