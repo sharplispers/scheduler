@@ -439,12 +439,16 @@
   ((tasks :initform nil :accessor list-scheduler-tasks)))
 
 (defmethod create-scheduler-task
-    ((scheduler in-memory-scheduler) cron-entry)
+    ((scheduler in-memory-scheduler) (cron-entry string))
   (mvb (time-specs command) (parse-cron-entry cron-entry)
-    (car (push (make-instance 'scheduler-task
-                              :time-specs time-specs
-                              :command command)
-               (list-scheduler-tasks scheduler)))))
+    (create-scheduler-task scheduler
+                           (make-instance 'scheduler-task
+                                          :time-specs time-specs
+                                          :command command))))
+
+(defmethod create-scheduler-task
+    ((scheduler in-memory-scheduler) (task scheduler-task))
+  (car (push task (list-scheduler-tasks scheduler))))
 
 (defmethod read-scheduler-task
     ((scheduler in-memory-scheduler) (task scheduler-task))
