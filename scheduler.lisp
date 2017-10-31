@@ -220,10 +220,11 @@
 
 ;;; we assume here that all `:random' entries are already picked and
 ;;; if `:step' present already coerced to sets.
-(defun compute-next-occurance (spec &optional (time (local-time:now)))
+(defun compute-next-occurance (spec &optional time)
   ;; algorithm is based on
   ;; https://stackoverflow.com/questions/321494/calculate-when-a-cron-job-will-be-executed-then-next-time#3453872
   (when (keywordp time) (return-from compute-next-occurance time))
+  (when (null time) (setf time (local-time:now)))
   (local-time:adjust-timestamp! time
     (set :nsec 0) (set :sec (random 60)) (offset :minute 1))
   (flet ((match-spec (obj spec)
@@ -349,8 +350,8 @@
    (last-execution :initform nil :initarg :last-execution :accessor task-last-execution)
    (next-execution :initform nil :initarg :next-execution :accessor task-next-execution)))
 
-(defmethod initialize-instance :after ((task task) &key time-specs)
-  (setf (task-next-execution task) (compute-next-occurance time-specs)))
+(defmethod initialize-instance :after ((task task) &key time-specs start-after)
+  (setf (task-next-execution task) (compute-next-occurance time-specs start-after)))
 
 (defmethod execute-task ((task task))
   (eval (read-from-string (task-command task))))
@@ -362,18 +363,14 @@
            (bt:with-recursive-lock-held ((scheduler-lock scheduler))
              (call-next-method)))
   (:method (scheduler (cron-entry string)
-            &key (start-after nil st-p) &allow-other-keys)
+            &key start-after &allow-other-keys)
     (mvb (time-specs command) (parse-cron-entry cron-entry)
       (create-scheduler-task
        scheduler
        (make-instance 'task
                       :time-specs time-specs
                       :command command
-                      :next-execution (compute-next-occurance
-                                       time-specs
-                                       (if st-p
-                                           start-after
-                                           (local-time:now))))))))
+                      :next-execution (compute-next-occurance time-specs start-after))))))
 
 (defgeneric read-scheduler-task (scheduler task)
   (:method :around ((scheduler scheduler) task)
