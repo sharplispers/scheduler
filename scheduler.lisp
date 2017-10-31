@@ -356,10 +356,10 @@
 (defmethod execute-task ((task task))
   (eval (read-from-string (task-command task))))
 
-(defgeneric create-scheduler-task (scheduler cron-entry
-                                   &key &allow-other-keys)
-  (:method :around ((scheduler scheduler) cron-entry &key &allow-other-keys)
-           (declare (ignore cron-entry))
+(defgeneric create-scheduler-task (scheduler time-entry
+                                   &key start-after &allow-other-keys)
+  (:method :around ((scheduler scheduler) entry &key &allow-other-keys)
+           (declare (ignore entry))
            (bt:with-recursive-lock-held ((scheduler-lock scheduler))
              (call-next-method)))
   (:method (scheduler (cron-entry string)
@@ -367,10 +367,7 @@
     (mvb (time-specs command) (parse-cron-entry cron-entry)
       (create-scheduler-task
        scheduler
-       (make-instance 'task
-                      :time-specs time-specs
-                      :command command
-                      :next-execution (compute-next-occurance time-specs start-after))))))
+       (make-instance 'task :time-specs time-specs :command command :start-after start-after)))))
 
 (defgeneric read-scheduler-task (scheduler task)
   (:method :around ((scheduler scheduler) task)
