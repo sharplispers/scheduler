@@ -31,6 +31,7 @@
            ;; task
            #:task
            #:task-time-specs #:task-command #:task-last-execution #:task-next-execution
+           #:task-source-entry
            #:execute-task))
 (in-package #:scheduler-implementation)
 
@@ -348,7 +349,8 @@
   ((time-specs :initarg :time-specs :accessor task-time-specs)
    (command :initarg :command :accessor task-command)
    (last-execution :initform nil :initarg :last-execution :accessor task-last-execution)
-   (next-execution :initform nil :initarg :next-execution :accessor task-next-execution)))
+   (next-execution :initform nil :initarg :next-execution :accessor task-next-execution)
+   (source-entry :initform nil :initarg :source-entry :accessor task-source-entry)))
 
 (defmethod initialize-instance :after ((task task) &key time-specs start-after)
   (setf (task-next-execution task) (compute-next-occurance time-specs start-after)))
@@ -367,7 +369,10 @@
     (mvb (time-specs command) (parse-cron-entry cron-entry)
       (create-scheduler-task
        scheduler
-       (make-instance 'task :time-specs time-specs :command command :start-after start-after)))))
+       (make-instance 'task :time-specs time-specs
+                      :command command
+                      :start-after start-after
+                      :source-entry cron-entry)))))
 
 (defgeneric read-scheduler-task (scheduler task)
   (:method :around ((scheduler scheduler) task)
