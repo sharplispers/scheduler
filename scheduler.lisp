@@ -183,24 +183,9 @@
    #+ (or) (assert (null (handler-case (parse-cron-time-1 "1/" range) (error () nil))))))
 
 
-(defun parse-cron-entry (spec &aux (spec (parse-cron-spec spec)))
-  (when (member (car spec) '(:reboot :shutdown))
-    (return-from parse-cron-entry (values `(:event ,(car spec)) (cdr spec))))
-  (db ((minute hour day-of-month month day-of-week) . command) spec
-    ;; XXX: seeding `*random-state*' with command ensures, that
-    ;; randomness is stable. This is useful for parsing H entries.
-    (let ((*random-state* (seed-random-state (sxhash command))))
-      (values
-       (list :minute (parse-cron-time-1 minute '#.(alexandria:iota 60))
-             :hour (parse-cron-time-1 hour '#.(alexandria:iota 24))
-             :day-of-month (if (char= (elt day-of-month 0) #\H)
-                               (parse-cron-time-1 day-of-month '#.(alexandria:iota 28 :start 1))
-                               (parse-cron-time-1 day-of-month '#.(alexandria:iota 31 :start 1)))
-             :month (parse-cron-time-1 month '#.(alexandria:iota 12 :start 1))
-             :day-of-week (if (string= day-of-week "7")
-                              (parse-cron-time-1 "0" '#.(alexandria:iota 7))
-                              (parse-cron-time-1 day-of-week '#.(alexandria:iota 7))))
-       command))))
+;;; XXX: backward compatibility (mainly for tests)
+(defun parse-cron-entry (spec)
+  (parse-entry (make-instance 'cron-entry :string spec)))
 
 #+test
 (funcall
@@ -217,6 +202,31 @@
    (assert (equal #1=(parse-cron-entry "H H H H H foo") #1#))
    (assert (null (equal (parse-cron-entry "H H H H H bar") #1#)))))
 
+(defclass scheduler-entry () ())
+(defgeneric parse-entry (entry)
+  (:documentation "Parses entry to return two values: the time spec and command."))
+
+(defclass cron-entry (scheduler-entry)
+  ((string :initarg :string :reader cron-entry-string)))
+
+(defmethod parse-entry ((entry cron-entry) &aux (spec (parse-cron-spec (cron-entry-string entry))))
+  (when (member (car spec) '(:reboot :shutdown))
+    (return-from parse-entry (values `(:event ,(car spec)) (cdr spec))))
+  (destructuring-bind ((minute hour day-of-month month day-of-week) . command) spec
+    ;; XXX: seeding `*random-state*' with command ensures, that
+    ;; randomness is stable. This is useful for parsing H entries.
+    (let ((*random-state* (seed-random-state (sxhash command))))
+      (values
+       (list :minute (parse-cron-time-1 minute '#.(alexandria:iota 60))
+             :hour (parse-cron-time-1 hour '#.(alexandria:iota 24))
+             :day-of-month (if (char= (elt day-of-month 0) #\H)
+                               (parse-cron-time-1 day-of-month '#.(alexandria:iota 28 :start 1))
+                               (parse-cron-time-1 day-of-month '#.(alexandria:iota 31 :start 1)))
+             :month (parse-cron-time-1 month '#.(alexandria:iota 12 :start 1))
+             :day-of-week (if (string= day-of-week "7")
+                              (parse-cron-time-1 "0" '#.(alexandria:iota 7))
+                              (parse-cron-time-1 day-of-week '#.(alexandria:iota 7))))
+       command))))
 
 
 ;;; we assume here that all `:random' entries are already picked and
