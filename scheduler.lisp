@@ -27,10 +27,21 @@
                 #:list-scheduler-tasks)
   (:export #:scheduler #:in-memory-scheduler
            #:start-scheduler #:stop-scheduler
-           #:create-scheduler-task #:read-scheduler-task #:update-scheduler-task #:delete-scheduler-task #:list-scheduler-tasks
+           #:create-scheduler-task
+           #:read-scheduler-task
+           #:update-scheduler-task
+           #:delete-scheduler-task
+           #:list-scheduler-tasks
+           ;; entry
+           #:scheduler-entry
+           #:cron-entry
+           #:parse-entry
            ;; task
            #:task
-           #:task-time-specs #:task-command #:task-last-execution #:task-next-execution
+           #:task-time-specs
+           #:task-command
+           #:task-last-execution
+           #:task-next-execution
            #:task-source-entry
            #:execute-task))
 (in-package #:scheduler-implementation)
