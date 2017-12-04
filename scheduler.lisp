@@ -47,14 +47,15 @@
 (in-package #:scheduler-implementation)
 
 ;; utils
-(defmacro ss (&rest args)
-  `(split-sequence:split-sequence #\space ,@args))
-(defmacro db (lambda-list expression &body body)
-  `(destructuring-bind ,lambda-list ,expression ,@body))
-(defmacro mvb (lambda-list expression &body body)
-  `(multiple-value-bind ,lambda-list ,expression ,@body))
-(defmacro ^if (test if-true if-false)
-  `(let ((^it ,test)) (if ^it ,if-true ,if-false)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmacro ss (&rest args)
+    `(split-sequence:split-sequence #\space ,@args))
+  (defmacro db (lambda-list expression &body body)
+    `(destructuring-bind ,lambda-list ,expression ,@body))
+  (defmacro mvb (lambda-list expression &body body)
+    `(multiple-value-bind ,lambda-list ,expression ,@body))
+  (defmacro ^if (test if-true if-false)
+    `(let ((^it ,test)) (if ^it ,if-true ,if-false))))
 
 (defun seed-random-state (seed)
   "Returns a new random state seeded with `object'."
