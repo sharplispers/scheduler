@@ -2,10 +2,16 @@
 
 (in-package #:asdf-user)
 
-(defsystem #:scheduler
+(defsystem "scheduler"
   :author "Daniel Kochmański <daniel@turtleware.eu>"
   :license "BSD-2-Clause"
   :description "Extensible task scheduler."
-  :depends-on (#:alexandria #:split-sequence #:local-time #:optima #:optima.ppcre)
+  :depends-on ("alexandria"
+               "bordeaux-threads"
+               "split-sequence"
+               "local-time"
+               "optima"
+               "optima.ppcre")
   :components ((:file "scheduler")
-               (:static-file "README.md")))
+               (:static-file "README.md")
+               (:static-file "LICENSE")))
