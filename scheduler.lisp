@@ -452,7 +452,7 @@
                                                     (task-time-specs task)
                                                     (local-time:now))))
                  ((active-task? task time/event-spec)
-                  (eval (read-from-string (task-command task)))
+                  (execute-task task)
                   (update-scheduler-task scheduler task
                                          :last-run time/event-spec
                                          :start-at (compute-next-occurance
