@@ -85,10 +85,9 @@
         (if (char/= #\@ (elt line 0))
             (split)
             (split-at))
-      (assert (and (or (member specs '(:reboot :shutdown))
-                       (alexandria:length= 5 specs))
-                   (not (alexandria:emptyp command))))
-      (cons specs command))))
+      (assert (or (member specs '(:reboot :shutdown))
+                  (alexandria:length= 5 specs)))
+      (cons specs (if (emptyp command) "nil" command)))))
 
 #+test
 (funcall
@@ -380,49 +379,69 @@
 (defmethod execute-task ((task task))
   (eval (read-from-string (task-command task))))
 
+;;; This type of a task may be harder to serialize. The command is a function
+;;; without arguments.
+(defclass lambda-task (task) ())
+
+(defmethod initialize-instance :after ((task lambda-task) &key)
+  (check-type (task-command task) function))
+
+(defmethod execute-task ((task lambda-task))
+  (funcall (task-command task)))
+
 (defgeneric create-scheduler-task (scheduler time-entry
                                    &key start-after &allow-other-keys)
   (:method :around ((scheduler scheduler) entry &key &allow-other-keys)
-           (declare (ignore entry))
-           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-             (call-next-method)))
+    (declare (ignore entry))
+    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+      (call-next-method)))
   (:method (scheduler (cron-entry string)
             &key start-after &allow-other-keys)
     (mvb (time-specs command) (parse-cron-entry cron-entry)
       (create-scheduler-task
        scheduler
        (make-instance 'task :time-specs time-specs
-                      :command command
-                      :start-after start-after
-                      :source-entry cron-entry)))))
+                            :command command
+                            :start-after start-after
+                            :source-entry cron-entry))))
+  (:method (scheduler (cron-entry-and-lambda cons)
+            &key start-after &allow-other-keys)
+    (db (cron-entry . command) cron-entry-and-lambda
+      (let ((time-specs (parse-cron-entry cron-entry)))
+        (create-scheduler-task
+         scheduler
+         (make-instance 'lambda-task :time-specs time-specs
+                                     :command command
+                                     :start-after start-after
+                                     :source-entry cron-entry-and-lambda))))))
 
 (defgeneric read-scheduler-task (scheduler task)
   (:method :around ((scheduler scheduler) task)
-           (declare (ignore task))
-           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-             (call-next-method))))
+    (declare (ignore task))
+    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+      (call-next-method))))
 
 (defgeneric update-scheduler-task
     (scheduler task &key cron-entry start-at &allow-other-keys)
   (:method :around ((scheduler scheduler) task &key)
-           (declare (ignore task))
-           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-             (call-next-method))))
+    (declare (ignore task))
+    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+      (call-next-method))))
 
 (defgeneric delete-scheduler-task (scheduler task)
   (:method :around ((scheduler scheduler) task)
-           (declare (ignore task))
-           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-             (call-next-method))))
+    (declare (ignore task))
+    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+      (call-next-method))))
 
 (defgeneric list-scheduler-tasks (scheduler)
   (:method :around ((scheduler scheduler))
-           (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-             (call-next-method)))
+    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
+      (call-next-method)))
   (:documentation "Lists all tasks registered with the scheduler."))
 
 (defun start-scheduler (scheduler)
-  (format *debug-io* "~&Starting scheduler.~%")
+  (format *debug-io* "~&Starting a scheduler.~%")
   (setf (scheduler-state scheduler) :running)
   (labels ((missed-task? (task)
              (and (typep (task-next-execution task) 'local-time:timestamp)
@@ -463,7 +482,7 @@
     (loop while (eql (scheduler-state scheduler) :running)
        do (progn (run-valid-tasks (local-time:now)) (sleep 1)))
     (run-valid-tasks :shutdown))
-  (format *debug-io* "~&Exiting scheduler.~%")
+  (format *debug-io* "~&Exiting a scheduler.~%")
   (setf (scheduler-state scheduler) :stopped))
 
 (defun stop-scheduler (scheduler)
@@ -512,7 +531,7 @@
        (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
        (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
        (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")
-       (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")
+       (create-scheduler-task scheduler (cons "@shutdown" #'scheduler-implementation::%yyy))
        ;; we remove one reboot task *before* starting the scheduler
        (delete-scheduler-task scheduler t1)
        (let ((thread (bt:make-thread (lambda () (start-scheduler scheduler)))))

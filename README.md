@@ -6,7 +6,7 @@ specific date or on regular basis. For now main component client is
 reporting module, but it may be used for scheduling calculation
 refresh, regular cleanups and similar.
 
-## Specifying task
+## Specifying a task
 
 Task should be added in a format similar to the one used
 in [cron tables](https://www.pantz.org/software/cron/croninfo.html).
@@ -48,6 +48,18 @@ H H(9-16)/2 * * 1-5 (grc:restart)
 
 # once a day on the 1st and 15th of every month except December
 H H 1,15 1-11 * nil
+```
+
+## Specifying a task with a function
+
+For convenience it is possible to specify a task as a cons of the time spec (a
+string time specification and a function with no arguments). Such tasks will be
+harder to serialize, however they should be fine for systems that doesn't
+require serialization.
+
+```
+> (scheduler:create-scheduler-task *scheduler*
+   (cons "* * * * *" (lambda () (print :minute))))
 ```
 
 ## Using scheduler
