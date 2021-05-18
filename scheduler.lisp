@@ -159,17 +159,22 @@
        (error "invalid clause")))))
 
 (defun parse-cron-time-1 (spec range)
-  (db (base . step) (ppcre:split "/" spec)
-    (let ((parse-result
-           (if (null step)
-               (%parse-cron-time-1/no-step base range)
-               (%parse-cron-time-1/step base range
-                                        (parse-integer (car step))))))
-      (assert (or (eql parse-result :every)
-                  (every (lambda (n) (member n range)) parse-result))
-              nil "PARSE-CRON-TIME-1: Each element of ~s must be a member of:~%~s."
-              parse-result (cons :every range))
-      parse-result)))
+  (sort
+   (remove-duplicates
+    (alexandria:flatten
+     (loop for spec in (ppcre:split "," spec)
+           collect (db (base . step) (ppcre:split "/" spec)
+                     (let ((parse-result
+                             (if (null step)
+                                 (%parse-cron-time-1/no-step base range)
+                                 (%parse-cron-time-1/step base range
+                                                          (parse-integer (car step))))))
+                       (assert (or (eql parse-result :every)
+                                   (every (lambda (n) (member n range)) parse-result))
+                               nil "PARSE-CRON-TIME-1: Each element of ~s must be a member of:~%~s."
+                               parse-result (cons :every range))
+                       parse-result)))))
+   #'<))
 
 #+test
 (funcall
@@ -566,7 +571,7 @@
 ;;  (:from 1 :to 4 :step 2)
 ;;  (1 2 3 4)
 ;;  ((1 2 3 4 5 6 7 9 12 23) :step 3)
- 
+
 ;;  ;; :random is equivalent to (:random :every)
 ;;  :random
 ;;  ;; (:random :step 2) is equivalent to (:random :every :step 2)
