@@ -1,8 +1,5 @@
 (in-package #:scheduler-implementation)
 
-;;(use-package :sqlite)
-;;(use-package :iter)
-
 (defvar *db-file-path*
   "Path to the SQLite DB file.")
 
@@ -21,9 +18,9 @@
 
 (defmethod list-scheduler-tasks ((scheduler sqlite-scheduler))
   (sqlite:with-open-database (db *db-file-path*)
-    (iterate:iter
-      (iterate:for (task) in-sqlite-query "select task from tasks" on-database db)
-      (iterate:collect (ms:unmarshal (read-from-string task))))))
+    (iter
+      (for (task) in-sqlite-query "select task from tasks" on-database db)
+      (collect (ms:unmarshal (read-from-string task))))))
 
 (defmethod create-scheduler-task
     ((scheduler sqlite-scheduler) (cron-entry string)
