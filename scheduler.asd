@@ -9,7 +9,10 @@
                "split-sequence"
                "local-time"
                "optima"
-               "optima.ppcre")
+               "optima.ppcre"
+               "sqlite"
+               "iterate")
   :components ((:file "scheduler")
+               (:file "sqlite")
                (:static-file "README.md")
                (:static-file "LICENSE")))
