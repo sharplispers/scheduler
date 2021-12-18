@@ -1,7 +1,7 @@
 (in-package #:scheduler-implementation)
 
-(use-package :sqlite)
-(use-package :iter)
+;;(use-package :sqlite)
+;;(use-package :iter)
 
 (defvar *db-file-path*
   "Path to the SQLite DB file.")

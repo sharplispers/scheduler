@@ -15,7 +15,7 @@
            #:list-scheduler-tasks))
 
 (defpackage #:scheduler-implementation
-  (:use #:cl #:alexandria)
+  (:use #:cl #:alexandria #:sqlite #:iter)
   (:import-from #:scheduler
                 #:scheduler
                 #:in-memory-scheduler
