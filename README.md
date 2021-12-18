@@ -174,8 +174,7 @@ Each task must have a text `name` which is used to identify it. Task
 names must be unique.
 
 ```
-> (defvar *scheduler* (make-instance 'scheduler:sqlite-scheduler
-                                     :db-path DB-FILENAME))
+> (defvar *scheduler* (make-instance 'scheduler:sqlite-scheduler :db-path DB-FILENAME))
 > (scheduler:create-scheduler-task *scheduler* "@reboot (print :reboot)" :name "Print reboot")
 ```
 
