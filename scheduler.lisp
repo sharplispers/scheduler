@@ -19,6 +19,7 @@
   (:import-from #:scheduler
                 #:scheduler
                 #:in-memory-scheduler
+                #:sqlite-scheduler
                 #:start-scheduler
                 #:stop-scheduler
                 #:create-scheduler-task
