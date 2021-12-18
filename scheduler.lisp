@@ -27,7 +27,7 @@
                 #:update-scheduler-task
                 #:delete-scheduler-task
                 #:list-scheduler-tasks)
-  (:export #:scheduler #:in-memory-scheduler
+  (:export #:scheduler #:in-memory-scheduler #:sqlite-scheduler
            #:start-scheduler #:stop-scheduler
            #:create-scheduler-task
            #:read-scheduler-task
