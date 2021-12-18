@@ -161,6 +161,24 @@ In this case scheduler loop will exit immedietely. It is an important
 clue, that it is unwise to schedule `stop-scheduler` call in
 scheduler, but rather call this function asynchronously.
 
+## Using SQLite backend
+
+The SQLite backend persists task state in a SQLite database. When a new task is
+created it will be loaded from the database if it exists there, otherwise it
+will be created.
+
+The location of the database file is specified to `make-instance` with the
+`:db-path` parameter.
+
+Each task must have a text `name` which is used to identify it. Task
+names must be unique.
+
+```
+> (defvar *scheduler* (make-instance 'scheduler:sqlite-scheduler
+                                     :db-path DB-FILENAME))
+> (scheduler:create-scheduler-task *scheduler* "@reboot (print :reboot)" :name "Print reboot")
+```
+
 ## Extending Scheduler
 
 This is extensible software. Scheduler is arranged around a simple
