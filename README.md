@@ -1,5 +1,5 @@
 
-# Instinct Engine Scheduler
+# Common Lisp Scheduler
 
 Module is designed for regular tasks which need to be performed on
 specific date or on regular basis. For now main component client is
