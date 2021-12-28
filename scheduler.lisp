@@ -101,17 +101,23 @@
    (assert (not (equalp (parse-cron-spec "@weekly command bar") (parse-cron-spec "@weekly command"))))
    (assert (equalp (parse-cron-spec "1 0 1/2 * 1,2 command foo") `(("1" "0" "1/2" "*" "1,2") . "command foo")))
    (assert (null (ignore-errors (parse-cron-spec "1 0 1/2"))))
-   (assert (null (ignore-errors (parse-cron-spec "@yearly "))))
    (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 "))))
-   (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 1 1 2"))))))
+   (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 1 1 2"))))
+   #+ (or) ;; let it slide as nil.
+   (assert (null (ignore-errors (parse-cron-spec "@yearly "))))))
 
 (defun %parse-cron-time-1/no-step (spec range)
   (optima:ematch spec
     ("*" :every)
     ("H" (list (alexandria:random-elt range)))
-    ;; 1,2,4,8
-    ((optima.ppcre:ppcre "^[0-9]+,.*")
-     (mapcar #'parse-integer (ppcre:split "," spec)))
+    ;; 1,2,4,8 | 1-4,5,6 etc
+    ((or (optima.ppcre:ppcre "^[0-9]+,.*")
+         (optima.ppcre:ppcre "^[0-9]+-[0-9]*,.*"))
+     ;; (mapcar #'parse-integer (ppcre:split "," spec))
+     (alexandria:mappend
+      (lambda (spec-1)
+        (%parse-cron-time-1/no-step spec-1 range))
+      (ppcre:split "," spec)))
     ;; H(1-12)
     ((optima.ppcre:ppcre "H\\(([0-9]+)-([0-9]+)\\)" from to)
      (let* ((from (parse-integer from))
@@ -122,8 +128,8 @@
     ((optima.ppcre:ppcre "([0-9]+)-([0-9]+)" from to)
      (let* ((from (parse-integer from))
             (to (parse-integer to))
-            (size (1+ (- to from))))
-       (alexandria:iota size :start from)))
+            (size (1+ (abs (- to from)))))
+       (alexandria:iota size :start (min to from))))
     ((optima.ppcre:ppcre "(^[0-9]+)" number)
      (list (parse-integer number)))))
 
@@ -178,6 +184,8 @@
    (assert (equalp (parse-cron-time-1 "*/2" '(1 2 3 4 5 6 7)) '(1 3 5 7)))
    (assert (equalp (parse-cron-time-1 "*/3" '(1 2 3 4 5 6 7)) '(1 4 7)))
    (assert (equalp (parse-cron-time-1 "18" range) '(18)))
+   (assert (equalp (parse-cron-time-1 "1-4,7-9,12" range) '(1 2 3 4 7 8 9 12)))
+   (assert (equalp (parse-cron-time-1 "1,4-7" range) '(1 4 5 6 7)))
    (assert (equalp (parse-cron-time-1 "0" (alexandria:iota 7)) '(0)))
    (assert (equalp (parse-cron-time-1 "2-6" '#.(alexandria:iota 7)) '(2 3 4 5 6)))
    (let ((result (parse-cron-time-1 "H/2" '(1 2 3 4 5 6 7))))
