@@ -1,4 +1,35 @@
-(in-package #:scheduler-implementation)
+(in-package #:cl)
+
+(defpackage #:scheduler-sqlite
+  (:use #:cl #:alexandria #:sqlite #:iterate)
+  (:import-from #:scheduler
+                #:sqlite-scheduler)
+  (:import-from #:scheduler-implementation
+                #:scheduler #:in-memory-scheduler 
+                #:start-scheduler #:stop-scheduler
+                #:create-scheduler-task
+                #:read-scheduler-task
+                #:update-scheduler-task
+                #:delete-scheduler-task
+                #:list-scheduler-tasks
+                ;; entry
+                #:scheduler-entry
+                #:cron-entry
+                #:parse-entry
+                #:parse-cron-entry
+                ;; task
+                #:task
+                #:task-time-specs
+                #:task-command
+                #:task-last-execution
+                #:task-next-execution
+                #:task-source-entry
+                #:execute-task)
+  (:export #:sqlite-scheduler
+           ;; task
+           #:sqlite-task))
+
+(in-package #:scheduler-sqlite)
 
 (defvar *db-file-path*
   "Path to the SQLite DB file.")
@@ -28,7 +59,7 @@
   (assert name)
   (if-let (task (read-scheduler-task scheduler name))
     task
-    (mvb (time-specs command) (parse-cron-entry cron-entry)
+    (multiple-value-bind (time-specs command) (parse-cron-entry cron-entry)
       (create-scheduler-task
        scheduler
        (make-instance 'sqlite-task :time-specs time-specs
@@ -60,7 +91,7 @@
      &key (cron-entry nil ce-p) (last-run nil lr-p) (start-at nil at-p))
   (assert (read-scheduler-task scheduler (task-name task)))
   (when ce-p
-    (mvb (time-specs command) (parse-cron-entry cron-entry)
+    (multiple-value-bind (time-specs command) (parse-cron-entry cron-entry)
       (setf (task-time-specs task) time-specs
             (task-command task) command)))
   (when at-p (setf (task-next-execution task) start-at))
@@ -78,7 +109,7 @@
     (sqlite:execute-non-query db "delete from tasks where name = ?" name)))
 
 (defmethod ms:class-persistent-slots ((self sqlite-task))
-  '(scheduler-implementation::name
+  '(name
     scheduler-implementation::time-specs
     scheduler-implementation::command
     scheduler-implementation::last-execution
