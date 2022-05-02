@@ -4,7 +4,6 @@
   (:use)
   (:export #:scheduler
            #:in-memory-scheduler
-           #:sqlite-scheduler
            #:start-scheduler
            #:stop-scheduler
            ;; CRUDL

@@ -2,8 +2,6 @@
 
 (defpackage #:scheduler-sqlite
   (:use #:cl #:alexandria #:sqlite #:scheduler-implementation)
-  (:import-from #:scheduler
-                #:sqlite-scheduler)
   (:export #:sqlite-scheduler
            ;; task
            #:sqlite-task))
