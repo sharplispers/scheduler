@@ -1,30 +1,9 @@
 (in-package #:cl)
 
 (defpackage #:scheduler-sqlite
-  (:use #:cl #:alexandria #:sqlite)
+  (:use #:cl #:alexandria #:sqlite #:scheduler-implementation)
   (:import-from #:scheduler
                 #:sqlite-scheduler)
-  (:import-from #:scheduler-implementation
-                #:scheduler #:in-memory-scheduler 
-                #:start-scheduler #:stop-scheduler
-                #:create-scheduler-task
-                #:read-scheduler-task
-                #:update-scheduler-task
-                #:delete-scheduler-task
-                #:list-scheduler-tasks
-                ;; entry
-                #:scheduler-entry
-                #:cron-entry
-                #:parse-entry
-                #:parse-cron-entry
-                ;; task
-                #:task
-                #:task-time-specs
-                #:task-command
-                #:task-last-execution
-                #:task-next-execution
-                #:task-source-entry
-                #:execute-task)
   (:export #:sqlite-scheduler
            ;; task
            #:sqlite-task))
