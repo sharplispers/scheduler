@@ -31,7 +31,7 @@
      &key start-after name &allow-other-keys)
   (assert name)
   (if-let (task (read-scheduler-task scheduler name))
-    task
+    (update-scheduler-task scheduler task :cron-entry cron-entry)
     (multiple-value-bind (time-specs command) (parse-cron-entry cron-entry)
       (create-scheduler-task
        scheduler
@@ -66,7 +66,8 @@
   (when ce-p
     (multiple-value-bind (time-specs command) (parse-cron-entry cron-entry)
       (setf (task-time-specs task) time-specs
-            (task-command task) command)))
+            (task-command task) command
+            (task-source-entry task) cron-entry)))
   (when at-p (setf (task-next-execution task) start-at))
   (when lr-p (setf (task-last-execution task) last-run))
   (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
