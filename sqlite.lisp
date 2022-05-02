@@ -1,7 +1,7 @@
 (in-package #:cl)
 
 (defpackage #:scheduler-sqlite
-  (:use #:cl #:alexandria #:sqlite #:iterate)
+  (:use #:cl #:alexandria #:sqlite)
   (:import-from #:scheduler
                 #:sqlite-scheduler)
   (:import-from #:scheduler-implementation
@@ -45,9 +45,12 @@
 
 (defmethod list-scheduler-tasks ((scheduler sqlite-scheduler))
   (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
-    (iter
-      (for (task) in-sqlite-query "select task from tasks" on-database db)
-      (collect (ms:unmarshal (read-from-string task))))))
+    (loop
+      with statement = (prepare-statement db "select task from tasks")
+      while (step-statement statement)
+      collect (ms:unmarshal (read-from-string
+                             (statement-column-value statement 0)))
+      finally (finalize-statement statement))))
 
 (defmethod create-scheduler-task
     ((scheduler sqlite-scheduler) (cron-entry string)
