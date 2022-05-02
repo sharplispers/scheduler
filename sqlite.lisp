@@ -31,16 +31,12 @@
 
 (in-package #:scheduler-sqlite)
 
-(defvar *db-file-path*
-  "Path to the SQLite DB file.")
-
 (defclass sqlite-scheduler (scheduler)
-  ())
+  ((db-path :initarg :db-path :initform (error "DB-PATH is required.")
+            :accessor sqlite-scheduler-db-path)))
 
-(defmethod initialize-instance :after ((scheduler sqlite-scheduler) &key db-path)
-  (assert db-path)
-  (setf *db-file-path* db-path)
-  (sqlite:with-open-database (db *db-file-path*)
+(defmethod initialize-instance :after ((scheduler sqlite-scheduler) &key)
+  (sqlite:with-open-database (db (slot-value scheduler 'db-path))
     (sqlite:execute-non-query
      db "create table if not exists tasks (name text primary key, task text not null)")))
 
@@ -48,7 +44,7 @@
   ((name :initarg :name :accessor task-name)))
 
 (defmethod list-scheduler-tasks ((scheduler sqlite-scheduler))
-  (sqlite:with-open-database (db *db-file-path*)
+  (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
     (iter
       (for (task) in-sqlite-query "select task from tasks" on-database db)
       (collect (ms:unmarshal (read-from-string task))))))
@@ -71,7 +67,7 @@
 (defmethod create-scheduler-task
     ((scheduler sqlite-scheduler) (task task)
      &key &allow-other-keys)
-  (sqlite:with-open-database (db *db-file-path*)
+  (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
     (sqlite:execute-non-query db
                               "insert into tasks (name, task) values (?,? )"
                               (task-name task)
@@ -80,7 +76,7 @@
 
 (defmethod read-scheduler-task
     ((scheduler sqlite-scheduler) (name string))
-  (sqlite:with-open-database (db *db-file-path*)
+  (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
     (if-let (task (sqlite:execute-single
                    db "select task from tasks where name = ?" name))
       (ms:unmarshal (read-from-string task))
@@ -96,7 +92,7 @@
             (task-command task) command)))
   (when at-p (setf (task-next-execution task) start-at))
   (when lr-p (setf (task-last-execution task) last-run))
-  (sqlite:with-open-database (db *db-file-path*)
+  (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
     (sqlite:execute-non-query db
                               "update tasks set task = ? where name = ?"
                               (format nil "~S" (ms:marshal task))
@@ -105,7 +101,7 @@
 
 (defmethod delete-scheduler-task
     ((scheduler sqlite-scheduler) (name string))
-  (sqlite:with-open-database (db *db-file-path*)
+  (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
     (sqlite:execute-non-query db "delete from tasks where name = ?" name)))
 
 (defmethod ms:class-persistent-slots ((self sqlite-task))
