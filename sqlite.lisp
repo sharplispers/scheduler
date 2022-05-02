@@ -25,8 +25,7 @@
     (loop
       with statement = (prepare-statement db "select task from tasks")
       while (step-statement statement)
-      collect (ms:unmarshal (read-from-string
-                             (statement-column-value statement 0)))
+      collect (deserialize-task (statement-column-value statement 0))
       finally (finalize-statement statement))))
 
 (defmethod create-scheduler-task
@@ -51,7 +50,7 @@
     (sqlite:execute-non-query db
                               "insert into tasks (name, task) values (?,? )"
                               (task-name task)
-                              (format nil "~S" (ms:marshal task))))
+                              (serialize-task task)))
   task)
 
 (defmethod read-scheduler-task
@@ -59,7 +58,7 @@
   (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
     (if-let (task (sqlite:execute-single
                    db "select task from tasks where name = ?" name))
-      (ms:unmarshal (read-from-string task))
+      (deserialize-task task)
       nil)))
 
 (defmethod update-scheduler-task
@@ -75,7 +74,7 @@
   (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
     (sqlite:execute-non-query db
                               "update tasks set task = ? where name = ?"
-                              (format nil "~S" (ms:marshal task))
+                              (serialize-task task)
                               (task-name task)))
   task)
 
@@ -84,15 +83,43 @@
   (sqlite:with-open-database (db (sqlite-scheduler-db-path scheduler))
     (sqlite:execute-non-query db "delete from tasks where name = ?" name)))
 
-(defmethod ms:class-persistent-slots ((self sqlite-task))
-  '(name
-    scheduler-implementation::time-specs
-    scheduler-implementation::command
-    scheduler-implementation::last-execution
-    scheduler-implementation::next-execution
-    scheduler-implementation::source-entry))
+(defun maybe-serialize-timestamp (maybe-timestamp)
+  (typecase maybe-timestamp
+    (local-time:timestamp (local-time:format-timestring
+                           nil maybe-timestamp))
+    (t maybe-timestamp)))
 
-(defmethod ms:class-persistent-slots ((self local-time:timestamp))
-  '(local-time::day
-    local-time::sec
-    local-time::nsec))
+(defun serialize-task (task)
+  (write-to-string
+   (list
+    (cons :name (task-name task))
+    (cons :time-specs (task-time-specs task))
+    (cons :command (task-command task))
+    (cons :last-execution (maybe-serialize-timestamp (task-last-execution task)))
+    (cons :next-execution (maybe-serialize-timestamp (task-next-execution task)))
+    (cons :source-entry (task-source-entry task)))))
+
+(defun maybe-deserialize-timestamp (maybe-timestamp-string)
+  (handler-case
+      (local-time:parse-timestring maybe-timestamp-string)
+    (error ()
+      maybe-timestamp-string)))
+
+(defun deserialize-task (string)
+  (let* ((task-slots (read-from-string string))
+         (out (allocate-instance (find-class 'sqlite-task))))
+    (setf (slot-value out 'name)
+          (alexandria:assoc-value task-slots :name))
+    (setf (slot-value out 'scheduler-implementation::time-specs)
+          (alexandria:assoc-value task-slots :time-specs))
+    (setf (slot-value out 'scheduler-implementation::command)
+          (alexandria:assoc-value task-slots :command))
+    (setf (slot-value out 'scheduler-implementation::last-execution)
+          (maybe-deserialize-timestamp
+           (alexandria:assoc-value task-slots :last-execution)))
+    (setf (slot-value out 'scheduler-implementation::next-execution)
+          (maybe-deserialize-timestamp
+           (alexandria:assoc-value task-slots :next-execution)))
+    (setf (slot-value out 'scheduler-implementation::source-entry)
+          (alexandria:assoc-value task-slots :source-entry))
+    (shared-initialize out t)))

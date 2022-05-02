@@ -36,6 +36,7 @@
            #:scheduler-entry
            #:cron-entry
            #:parse-entry
+           #:parse-cron-entry
            ;; task
            #:task
            #:task-time-specs

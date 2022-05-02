@@ -16,7 +16,5 @@
 
 (defsystem "scheduler/sqlite"
   :depends-on ("scheduler"
-               "marshal"
-               "sqlite"
-               "iterate")
+               "sqlite")
   :components ((:file "sqlite")))
