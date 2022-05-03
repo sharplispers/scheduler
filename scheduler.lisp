@@ -1,4 +1,5 @@
 ;;; Copyright (c) 2017, Emergent Network Defense <http://endsecurity.com/>
+;;; Copyright (c) 2017-2022, Daniel Kochmański <daniel@turtleware.eu>
 
 (defpackage #:scheduler
   (:use)
@@ -89,23 +90,6 @@
                   (alexandria:length= 5 specs)))
       (cons specs (if (emptyp command) "nil" command)))))
 
-#+test
-(funcall
- (defun test-parse-cron-spec ()
-   (assert (equalp (parse-cron-spec "@reboot (lambda () (list 1 2 3))") `(:reboot . "(lambda () (list 1 2 3))")))
-   (assert (equalp (parse-cron-spec "@shutdown (lambda () (list 1 2 3))") `(:shutdown . "(lambda () (list 1 2 3))")))
-   (assert (equalp (parse-cron-spec "@yearly command") `(("H" "H" "H" "H" "*") . "command")))
-   (assert (equalp (parse-cron-spec "@yearly command") (parse-cron-spec "@annually command")))
-   (assert (equalp (parse-cron-spec "@daily command") (parse-cron-spec "@midnight command")))
-   (assert (not (equalp (parse-cron-spec "@daily command!") (parse-cron-spec "@midnight command"))))
-   (assert (not (equalp (parse-cron-spec "@weekly command bar") (parse-cron-spec "@weekly command"))))
-   (assert (equalp (parse-cron-spec "1 0 1/2 * 1,2 command foo") `(("1" "0" "1/2" "*" "1,2") . "command foo")))
-   (assert (null (ignore-errors (parse-cron-spec "1 0 1/2"))))
-   (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 "))))
-   (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 1 1 2"))))
-   #+ (or) ;; let it slide as nil.
-   (assert (null (ignore-errors (parse-cron-spec "@yearly "))))))
-
 (defun %parse-cron-time-1/no-step (spec range)
   (optima:ematch spec
     ("*" :every)
@@ -177,49 +161,10 @@
               parse-result (cons :every range))
       parse-result)))
 
-#+test
-(funcall
- (defun test-parse-cron-time-1 (&aux (range (alexandria:iota 30)))
-   (assert (equalp (parse-cron-time-1 "*" range) :every))
-   (assert (equalp (parse-cron-time-1 "*/2" '(1 2 3 4 5 6 7)) '(1 3 5 7)))
-   (assert (equalp (parse-cron-time-1 "*/3" '(1 2 3 4 5 6 7)) '(1 4 7)))
-   (assert (equalp (parse-cron-time-1 "18" range) '(18)))
-   (assert (equalp (parse-cron-time-1 "1-4,7-9,12" range) '(1 2 3 4 7 8 9 12)))
-   (assert (equalp (parse-cron-time-1 "1,4-7" range) '(1 4 5 6 7)))
-   (assert (equalp (parse-cron-time-1 "0" (alexandria:iota 7)) '(0)))
-   (assert (equalp (parse-cron-time-1 "2-6" '#.(alexandria:iota 7)) '(2 3 4 5 6)))
-   (let ((result (parse-cron-time-1 "H/2" '(1 2 3 4 5 6 7))))
-     (assert (or (equalp result '(1 3 5 7))
-                 (equalp result '(2 4 6)))))
-   (let ((result (parse-cron-time-1 "H(8-12)/2" range)))
-     (assert (or (equalp result '(8 10 12)) (equalp result '(9 11)))))
-   (assert (member (first (parse-cron-time-1 "H(8-12)" range))
-                   (alexandria:iota 5 :start 8)))
-   (assert (null (ignore-errors (parse-cron-time-1 "H(1,2)" range))))
-   (assert (null (ignore-errors (parse-cron-time-1 "1,2,4/2" '(1 2 3 4)))))
-   (assert (null (ignore-errors (parse-cron-time-1 "18/2" range))))
-   ;; we let that pass (due to being lazy) "1/" === "1"
-   #+ (or) (assert (null (handler-case (parse-cron-time-1 "1/" range) (error () nil))))))
-
 
 ;;; XXX: backward compatibility (mainly for tests)
 (defun parse-cron-entry (spec)
   (parse-entry (make-instance 'cron-entry :string spec)))
-
-#+test
-(funcall
- (defun test-parse-cron-entry ()
-   (parse-cron-entry "@reboot foo")
-   (parse-cron-entry "@shutdown foo")
-   (parse-cron-entry "@yearly foo")
-   (parse-cron-entry "@weekly foo")
-   (parse-cron-entry "@daily foo")
-   (parse-cron-entry "@midnight foo")
-   (parse-cron-entry "@annually foo")
-   (assert (null (ignore-errors (parse-cron-entry "0 0 0 0 0 foo"))))
-   (assert (equal (getf (parse-cron-entry "* * * * 0 foo") :day-of-week) '(0)))
-   (assert (equal #1=(parse-cron-entry "H H H H H foo") #1#))
-   (assert (null (equal (parse-cron-entry "H H H H H bar") #1#)))))
 
 (defclass scheduler-entry () ())
 (defgeneric parse-entry (entry)
@@ -344,29 +289,6 @@
                     (return))
                   (return-from compute-next-occurance time)))))))
 
-#+test
-(funcall
- (defun test-compute-next-occurance ()
-   (flet ((et (&rest args) (apply #'local-time:encode-timestamp 0 0 args))
-          (st (time) (local-time:adjust-timestamp time (set :sec 0))))
-     (assert (local-time:timestamp=
-              (st (compute-next-occurance (parse-cron-entry "0 0 1 1 0 foo")))
-              (et 0 0 1 1 2023)))
-     (assert (local-time:timestamp=
-              (st (compute-next-occurance
-                   (parse-cron-entry "0 0 1 1 * foo") (et 1 0 1 1 2017)))
-              (et 0 0 1 1 2018)))
-     (assert (and (local-time:timestamp<=
-                   (et 0 0 1 1 2018)
-                   (st (compute-next-occurance
-                        (parse-cron-entry "H H 1 1 * foo") (et 0 0 2 1 2017))))
-                  (local-time:timestamp>=
-                   (et 59 23 1 1 2018)
-                   (st (compute-next-occurance
-                        (parse-cron-entry "H H 1 1 * foo") (et 0 0 2 1 2017))))))
-     (assert
-      (null (ignore-errors (compute-next-occurance
-                            (parse-cron-entry "0 0 0 0 0 foo"))))))))
 
 
 (defclass scheduler ()
@@ -524,48 +446,6 @@
 (defmethod delete-scheduler-task
     ((scheduler in-memory-scheduler) (task task))
   (setf (list-scheduler-tasks scheduler) (delete task (list-scheduler-tasks scheduler))))
-
-#+test
-(let (foobar xxx yyy)
-  (defun %foobar () (incf foobar))
-  (defun %xxx () (incf xxx))
-  (defun %yyy () (incf yyy))
-  (funcall
-   (defun test-in-memory-scheduler-1 ()
-     (setf foobar 0 xxx 0 yyy 0)
-     (let* ((scheduler (make-instance 'in-memory-scheduler))
-            (t1 (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)"))
-            (t2 (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")))
-       (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
-       (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
-       (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")
-       (create-scheduler-task scheduler (cons "@shutdown" #'scheduler-implementation::%yyy))
-       ;; we remove one reboot task *before* starting the scheduler
-       (delete-scheduler-task scheduler t1)
-       (let ((thread (bt:make-thread (lambda () (start-scheduler scheduler)))))
-         (sleep 1)
-         ;; and one shutdown task *before* stopping the scheduler
-         (delete-scheduler-task scheduler t2)
-         (sleep 1)
-         (stop-scheduler scheduler)
-         (bt:join-thread thread))
-       (assert (= xxx yyy 2)))))
-  (funcall
-   (defun test-in-memory-scheduler-2 ()
-     (setf foobar 0 xxx 0 yyy 0)
-     (let ((scheduler (make-instance 'in-memory-scheduler)))
-       (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
-       (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")
-       (create-scheduler-task scheduler "H/2 * * * * (scheduler-implementation::%foobar)")
-       (create-scheduler-task scheduler "* * * * * (scheduler-implementation::%foobar)")
-       (create-scheduler-task scheduler "H/3 * * * * (scheduler-implementation::%foobar)")
-       (let ((thread (bt:make-thread (lambda () (start-scheduler scheduler)))))
-         (sleep 180)
-         (stop-scheduler scheduler)
-         (bt:join-thread thread))
-       (assert (= xxx 1))
-       (assert (= yyy 1))
-       (assert (>= foobar 3))))))
 
 
 ;; (list
