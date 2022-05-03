@@ -296,54 +296,12 @@
    (%lock :initform (bt:make-recursive-lock "scheduler lock") :accessor scheduler-lock))
   (:documentation "Thread-safe abstract scheduler class."))
 
-(defclass task ()
-  ((time-specs :initarg :time-specs :accessor task-time-specs)
-   (command :initarg :command :accessor task-command)
-   (last-execution :initform nil :initarg :last-execution :accessor task-last-execution)
-   (next-execution :initform nil :initarg :next-execution :accessor task-next-execution)
-   (source-entry :initform nil :initarg :source-entry :accessor task-source-entry)))
-
-(defmethod initialize-instance :after ((task task) &key time-specs start-after)
-  (setf (task-next-execution task) (compute-next-occurance time-specs start-after)))
-
-(defmethod execute-task ((task task))
-  (eval (read-from-string (task-command task))))
-
-;;; This type of a task may be harder to serialize. The command is a function
-;;; without arguments.
-(defclass lambda-task (task) ())
-
-(defmethod initialize-instance :after ((task lambda-task) &key)
-  (check-type (task-command task) function))
-
-(defmethod execute-task ((task lambda-task))
-  (funcall (task-command task)))
-
 (defgeneric create-scheduler-task (scheduler time-entry
                                    &key start-after &allow-other-keys)
   (:method :around ((scheduler scheduler) entry &key &allow-other-keys)
     (declare (ignore entry))
     (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method)))
-  (:method (scheduler (cron-entry string)
-            &key start-after &allow-other-keys)
-    (mvb (time-specs command) (parse-cron-entry cron-entry)
-      (create-scheduler-task
-       scheduler
-       (make-instance 'task :time-specs time-specs
-                            :command command
-                            :start-after start-after
-                            :source-entry cron-entry))))
-  (:method (scheduler (cron-entry-and-lambda cons)
-            &key start-after &allow-other-keys)
-    (db (cron-entry . command) cron-entry-and-lambda
-      (let ((time-specs (parse-cron-entry cron-entry)))
-        (create-scheduler-task
-         scheduler
-         (make-instance 'lambda-task :time-specs time-specs
-                                     :command command
-                                     :start-after start-after
-                                     :source-entry cron-entry-and-lambda))))))
+      (call-next-method))))
 
 (defgeneric read-scheduler-task (scheduler task)
   (:method :around ((scheduler scheduler) task)
@@ -419,20 +377,37 @@
   (setf (scheduler-state scheduler) :exit))
 
 
-(defclass in-memory-scheduler (scheduler)
-  ((tasks :initform nil :accessor list-scheduler-tasks)))
 
-(defmethod create-scheduler-task
-    ((scheduler in-memory-scheduler) (task task)
-     &key &allow-other-keys)
-  (car (push task (list-scheduler-tasks scheduler))))
+(defclass task ()
+  ((time-specs :initarg :time-specs :accessor task-time-specs)
+   (command :initarg :command :accessor task-command)
+   (last-execution :initform nil :initarg :last-execution :accessor task-last-execution)
+   (next-execution :initform nil :initarg :next-execution :accessor task-next-execution)
+   (source-entry :initform nil :initarg :source-entry :accessor task-source-entry)))
 
-(defmethod read-scheduler-task
-    ((scheduler in-memory-scheduler) (task task))
+(defmethod initialize-instance :after ((task task) &key time-specs start-after)
+  (setf (task-next-execution task) (compute-next-occurance time-specs start-after)))
+
+(defmethod execute-task ((task task))
+  (eval (read-from-string (task-command task))))
+
+;;; Default parser for strings.
+(defmethod create-scheduler-task ((scheduler scheduler) (cron-entry string)
+                                  &key start-after &allow-other-keys)
+  (mvb (time-specs command) (parse-cron-entry cron-entry)
+    (create-scheduler-task
+     scheduler
+     (make-instance 'task :time-specs time-specs
+                          :command command
+                          :start-after start-after
+                          :source-entry cron-entry))))
+
+;;; Default methods
+(defmethod read-scheduler-task ((scheduler scheduler) (task task))
   (find task (list-scheduler-tasks scheduler)))
 
 (defmethod update-scheduler-task
-    ((scheduler in-memory-scheduler) (task task)
+    ((scheduler scheduler) (task task)
      &key (cron-entry nil ce-p) (last-run nil lr-p) (start-at nil at-p))
   (assert (find task (list-scheduler-tasks scheduler)))
   (when ce-p
@@ -443,9 +418,43 @@
   (when lr-p (setf (task-last-execution task) last-run))
   task)
 
+;;; This type of a task may be harder to serialize. The command is a function
+;;; without arguments.
+(defclass lambda-task (task) ())
+
+(defmethod initialize-instance :after ((task lambda-task) &key)
+  (check-type (task-command task) function))
+
+(defmethod execute-task ((task lambda-task))
+  (funcall (task-command task)))
+
+;;; Similar to the above, but the command is a function.
+(defmethod create-scheduler-task ((scheduler scheduler) (cron-entry-and-lambda cons)
+                                  &key start-after &allow-other-keys)
+  (db (cron-entry . command) cron-entry-and-lambda
+    (assert (functionp command))
+    (let ((time-specs (parse-cron-entry cron-entry)))
+      (create-scheduler-task
+       scheduler
+       (make-instance 'lambda-task :time-specs time-specs
+                                   :command command
+                                   :start-after start-after
+                                   :source-entry cron-entry-and-lambda)))))
+
+
+;;; Scheduler classes
+
+(defclass in-memory-scheduler (scheduler)
+  ((tasks :initform nil :accessor list-scheduler-tasks)))
+
+(defmethod create-scheduler-task
+    ((scheduler in-memory-scheduler) (task task)
+     &key &allow-other-keys)
+  (car (push task (list-scheduler-tasks scheduler))))
+
 (defmethod delete-scheduler-task
     ((scheduler in-memory-scheduler) (task task))
-  (setf (list-scheduler-tasks scheduler) (delete task (list-scheduler-tasks scheduler))))
+  (alexandria:removef (list-scheduler-tasks scheduler) task))
 
 
 ;; (list
