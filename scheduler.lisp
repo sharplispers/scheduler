@@ -1,4 +1,5 @@
 ;;; Copyright (c) 2017, Emergent Network Defense <http://endsecurity.com/>
+;;; Copyright (c) 2017-2022, Daniel Kochmański <daniel@turtleware.eu>
 
 (defpackage #:scheduler
   (:use)
@@ -89,23 +90,6 @@
                   (alexandria:length= 5 specs)))
       (cons specs (if (emptyp command) "nil" command)))))
 
-#+test
-(funcall
- (defun test-parse-cron-spec ()
-   (assert (equalp (parse-cron-spec "@reboot (lambda () (list 1 2 3))") `(:reboot . "(lambda () (list 1 2 3))")))
-   (assert (equalp (parse-cron-spec "@shutdown (lambda () (list 1 2 3))") `(:shutdown . "(lambda () (list 1 2 3))")))
-   (assert (equalp (parse-cron-spec "@yearly command") `(("H" "H" "H" "H" "*") . "command")))
-   (assert (equalp (parse-cron-spec "@yearly command") (parse-cron-spec "@annually command")))
-   (assert (equalp (parse-cron-spec "@daily command") (parse-cron-spec "@midnight command")))
-   (assert (not (equalp (parse-cron-spec "@daily command!") (parse-cron-spec "@midnight command"))))
-   (assert (not (equalp (parse-cron-spec "@weekly command bar") (parse-cron-spec "@weekly command"))))
-   (assert (equalp (parse-cron-spec "1 0 1/2 * 1,2 command foo") `(("1" "0" "1/2" "*" "1,2") . "command foo")))
-   (assert (null (ignore-errors (parse-cron-spec "1 0 1/2"))))
-   (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 "))))
-   (assert (null (ignore-errors (parse-cron-spec "@foo 3 4 1 1 2"))))
-   #+ (or) ;; let it slide as nil.
-   (assert (null (ignore-errors (parse-cron-spec "@yearly "))))))
-
 (defun %parse-cron-time-1/no-step (spec range)
   (optima:ematch spec
     ("*" :every)
@@ -177,49 +161,10 @@
               parse-result (cons :every range))
       parse-result)))
 
-#+test
-(funcall
- (defun test-parse-cron-time-1 (&aux (range (alexandria:iota 30)))
-   (assert (equalp (parse-cron-time-1 "*" range) :every))
-   (assert (equalp (parse-cron-time-1 "*/2" '(1 2 3 4 5 6 7)) '(1 3 5 7)))
-   (assert (equalp (parse-cron-time-1 "*/3" '(1 2 3 4 5 6 7)) '(1 4 7)))
-   (assert (equalp (parse-cron-time-1 "18" range) '(18)))
-   (assert (equalp (parse-cron-time-1 "1-4,7-9,12" range) '(1 2 3 4 7 8 9 12)))
-   (assert (equalp (parse-cron-time-1 "1,4-7" range) '(1 4 5 6 7)))
-   (assert (equalp (parse-cron-time-1 "0" (alexandria:iota 7)) '(0)))
-   (assert (equalp (parse-cron-time-1 "2-6" '#.(alexandria:iota 7)) '(2 3 4 5 6)))
-   (let ((result (parse-cron-time-1 "H/2" '(1 2 3 4 5 6 7))))
-     (assert (or (equalp result '(1 3 5 7))
-                 (equalp result '(2 4 6)))))
-   (let ((result (parse-cron-time-1 "H(8-12)/2" range)))
-     (assert (or (equalp result '(8 10 12)) (equalp result '(9 11)))))
-   (assert (member (first (parse-cron-time-1 "H(8-12)" range))
-                   (alexandria:iota 5 :start 8)))
-   (assert (null (ignore-errors (parse-cron-time-1 "H(1,2)" range))))
-   (assert (null (ignore-errors (parse-cron-time-1 "1,2,4/2" '(1 2 3 4)))))
-   (assert (null (ignore-errors (parse-cron-time-1 "18/2" range))))
-   ;; we let that pass (due to being lazy) "1/" === "1"
-   #+ (or) (assert (null (handler-case (parse-cron-time-1 "1/" range) (error () nil))))))
-
 
 ;;; XXX: backward compatibility (mainly for tests)
 (defun parse-cron-entry (spec)
   (parse-entry (make-instance 'cron-entry :string spec)))
-
-#+test
-(funcall
- (defun test-parse-cron-entry ()
-   (parse-cron-entry "@reboot foo")
-   (parse-cron-entry "@shutdown foo")
-   (parse-cron-entry "@yearly foo")
-   (parse-cron-entry "@weekly foo")
-   (parse-cron-entry "@daily foo")
-   (parse-cron-entry "@midnight foo")
-   (parse-cron-entry "@annually foo")
-   (assert (null (ignore-errors (parse-cron-entry "0 0 0 0 0 foo"))))
-   (assert (equal (getf (parse-cron-entry "* * * * 0 foo") :day-of-week) '(0)))
-   (assert (equal #1=(parse-cron-entry "H H H H H foo") #1#))
-   (assert (null (equal (parse-cron-entry "H H H H H bar") #1#)))))
 
 (defclass scheduler-entry () ())
 (defgeneric parse-entry (entry)
@@ -344,111 +289,34 @@
                     (return))
                   (return-from compute-next-occurance time)))))))
 
-#+test
-(funcall
- (defun test-compute-next-occurance ()
-   (flet ((et (&rest args) (apply #'local-time:encode-timestamp 0 0 args))
-          (st (time) (local-time:adjust-timestamp time (set :sec 0))))
-     (assert (local-time:timestamp=
-              (st (compute-next-occurance (parse-cron-entry "0 0 1 1 0 foo")))
-              (et 0 0 1 1 2023)))
-     (assert (local-time:timestamp=
-              (st (compute-next-occurance
-                   (parse-cron-entry "0 0 1 1 * foo") (et 1 0 1 1 2017)))
-              (et 0 0 1 1 2018)))
-     (assert (and (local-time:timestamp<=
-                   (et 0 0 1 1 2018)
-                   (st (compute-next-occurance
-                        (parse-cron-entry "H H 1 1 * foo") (et 0 0 2 1 2017))))
-                  (local-time:timestamp>=
-                   (et 59 23 1 1 2018)
-                   (st (compute-next-occurance
-                        (parse-cron-entry "H H 1 1 * foo") (et 0 0 2 1 2017))))))
-     (assert
-      (null (ignore-errors (compute-next-occurance
-                            (parse-cron-entry "0 0 0 0 0 foo"))))))))
 
 
 (defclass scheduler ()
-  ((%state :initform :stopped :accessor scheduler-state)
-   (%lock :initform (bt:make-recursive-lock "scheduler lock") :accessor scheduler-lock))
+  ((%state :initform :stopped :accessor scheduler-state))
   (:documentation "Thread-safe abstract scheduler class."))
 
-(defclass task ()
-  ((time-specs :initarg :time-specs :accessor task-time-specs)
-   (command :initarg :command :accessor task-command)
-   (last-execution :initform nil :initarg :last-execution :accessor task-last-execution)
-   (next-execution :initform nil :initarg :next-execution :accessor task-next-execution)
-   (source-entry :initform nil :initarg :source-entry :accessor task-source-entry)))
+(defgeneric create-scheduler-task (scheduler entry &key &allow-other-keys)
+  (:documentation "Parse ENTRY and add the task it to SCHEDULER."))
 
-(defmethod initialize-instance :after ((task task) &key time-specs start-after)
-  (setf (task-next-execution task) (compute-next-occurance time-specs start-after)))
+(defgeneric update-scheduler-task (scheduler entry &key &allow-other-keys)
+  (:documentation "Update the task designated by ENTRY in SCHEDULER."))
 
-(defmethod execute-task ((task task))
-  (eval (read-from-string (task-command task))))
+(defgeneric read-scheduler-task (scheduler entry)
+  (:documentation "Find the task designated by ENTRY in SCHEDULER."))
 
-;;; This type of a task may be harder to serialize. The command is a function
-;;; without arguments.
-(defclass lambda-task (task) ())
-
-(defmethod initialize-instance :after ((task lambda-task) &key)
-  (check-type (task-command task) function))
-
-(defmethod execute-task ((task lambda-task))
-  (funcall (task-command task)))
-
-(defgeneric create-scheduler-task (scheduler time-entry
-                                   &key start-after &allow-other-keys)
-  (:method :around ((scheduler scheduler) entry &key &allow-other-keys)
-    (declare (ignore entry))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method)))
-  (:method (scheduler (cron-entry string)
-            &key start-after &allow-other-keys)
-    (mvb (time-specs command) (parse-cron-entry cron-entry)
-      (create-scheduler-task
-       scheduler
-       (make-instance 'task :time-specs time-specs
-                            :command command
-                            :start-after start-after
-                            :source-entry cron-entry))))
-  (:method (scheduler (cron-entry-and-lambda cons)
-            &key start-after &allow-other-keys)
-    (db (cron-entry . command) cron-entry-and-lambda
-      (let ((time-specs (parse-cron-entry cron-entry)))
-        (create-scheduler-task
-         scheduler
-         (make-instance 'lambda-task :time-specs time-specs
-                                     :command command
-                                     :start-after start-after
-                                     :source-entry cron-entry-and-lambda))))))
-
-(defgeneric read-scheduler-task (scheduler task)
-  (:method :around ((scheduler scheduler) task)
-    (declare (ignore task))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method))))
-
-(defgeneric update-scheduler-task
-    (scheduler task &key cron-entry start-at &allow-other-keys)
-  (:method :around ((scheduler scheduler) task &key)
-    (declare (ignore task))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method))))
-
-(defgeneric delete-scheduler-task (scheduler task)
-  (:method :around ((scheduler scheduler) task)
-    (declare (ignore task))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method))))
+(defgeneric delete-scheduler-task (scheduler entry)
+  (:documentation "Delete the task designated by ENTRY in SCHEDULER."))
 
 (defgeneric list-scheduler-tasks (scheduler)
-  (:method :around ((scheduler scheduler))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method)))
-  (:documentation "Lists all tasks registered with the scheduler."))
+  (:documentation "Lists all tasks registered with SCHEDULER."))
 
-(defun start-scheduler (scheduler)
+(defgeneric start-scheduler (scheduler)
+  (:documentation "Start the scheduler."))
+
+(defgeneric stop-scheduler (scheduler)
+  (:documentation "Stop the scheduler."))
+
+(defmethod start-scheduler ((scheduler scheduler))
   (format *debug-io* "~&Starting a scheduler.~%")
   (setf (scheduler-state scheduler) :running)
   (labels ((missed-task? (task)
@@ -488,15 +356,87 @@
 
     (run-valid-tasks :reboot)
     (loop while (eql (scheduler-state scheduler) :running)
-       do (progn (run-valid-tasks (local-time:now)) (sleep 1)))
+          do (progn (run-valid-tasks (local-time:now)) (sleep 1)))
     (run-valid-tasks :shutdown))
   (format *debug-io* "~&Exiting a scheduler.~%")
   (setf (scheduler-state scheduler) :stopped))
 
-(defun stop-scheduler (scheduler)
+(defmethod stop-scheduler ((scheduler scheduler))
   (setf (scheduler-state scheduler) :exit))
 
 
+
+(defclass task ()
+  ((time-specs :initarg :time-specs :accessor task-time-specs)
+   (command :initarg :command :accessor task-command)
+   (last-execution :initform nil :initarg :last-execution :accessor task-last-execution)
+   (next-execution :initform nil :initarg :next-execution :accessor task-next-execution)
+   (source-entry :initform nil :initarg :source-entry :accessor task-source-entry)))
+
+(defmethod initialize-instance :after ((task task) &key time-specs start-after)
+  (setf (task-next-execution task) (compute-next-occurance time-specs start-after)))
+
+(defmethod execute-task ((task task))
+  (eval (read-from-string (task-command task))))
+
+;;; Default parser for strings.
+(defmethod create-scheduler-task ((scheduler scheduler) (cron-entry string)
+                                  &key start-after &allow-other-keys)
+  (mvb (time-specs command) (parse-cron-entry cron-entry)
+    (create-scheduler-task
+     scheduler
+     (make-instance 'task :time-specs time-specs
+                          :command command
+                          :start-after start-after
+                          :source-entry cron-entry))))
+
+;;; Default methods
+(defmethod read-scheduler-task ((scheduler scheduler) (task task))
+  (find task (list-scheduler-tasks scheduler)))
+
+(defmethod update-scheduler-task
+    ((scheduler scheduler) (task task)
+     &key (cron-entry nil ce-p) (last-run nil lr-p) (start-at nil at-p))
+  (assert (find task (list-scheduler-tasks scheduler)))
+  ;; We update either the entry itself (then the next occurance is computed), or
+  ;; we've just executed the command and we update last-run and start-at.
+  (assert (alexandria:xor ce-p (or at-p lr-p)))
+  (when ce-p
+    (mvb (time-specs command) (parse-cron-entry cron-entry)
+      (setf (task-source-entry task) cron-entry
+            (task-time-specs task) time-specs
+            (task-command task) command
+            (task-next-execution task) (compute-next-occurance time-specs))))
+  (when at-p (setf (task-next-execution task) start-at))
+  (when lr-p (setf (task-last-execution task) last-run))
+  task)
+
+;;; This type of a task may be harder to serialize. The command is a function
+;;; without arguments.
+(defclass lambda-task (task) ())
+
+(defmethod initialize-instance :after ((task lambda-task) &key)
+  (check-type (task-command task) function))
+
+(defmethod execute-task ((task lambda-task))
+  (funcall (task-command task)))
+
+;;; Similar to the above, but the command is a function.
+(defmethod create-scheduler-task ((scheduler scheduler) (cron-entry-and-lambda cons)
+                                  &key start-after &allow-other-keys)
+  (db (cron-entry . command) cron-entry-and-lambda
+    (assert (functionp command))
+    (let ((time-specs (parse-cron-entry cron-entry)))
+      (create-scheduler-task
+       scheduler
+       (make-instance 'lambda-task :time-specs time-specs
+                                   :command command
+                                   :start-after start-after
+                                   :source-entry cron-entry-and-lambda)))))
+
+
+;;; Scheduler classes
+
 (defclass in-memory-scheduler (scheduler)
   ((tasks :initform nil :accessor list-scheduler-tasks)))
 
@@ -505,67 +445,9 @@
      &key &allow-other-keys)
   (car (push task (list-scheduler-tasks scheduler))))
 
-(defmethod read-scheduler-task
-    ((scheduler in-memory-scheduler) (task task))
-  (find task (list-scheduler-tasks scheduler)))
-
-(defmethod update-scheduler-task
-    ((scheduler in-memory-scheduler) (task task)
-     &key (cron-entry nil ce-p) (last-run nil lr-p) (start-at nil at-p))
-  (assert (find task (list-scheduler-tasks scheduler)))
-  (when ce-p
-    (mvb (time-specs command) (parse-cron-entry cron-entry)
-      (setf (task-time-specs task) time-specs
-            (task-command task) command)))
-  (when at-p (setf (task-next-execution task) start-at))
-  (when lr-p (setf (task-last-execution task) last-run))
-  task)
-
 (defmethod delete-scheduler-task
     ((scheduler in-memory-scheduler) (task task))
-  (setf (list-scheduler-tasks scheduler) (delete task (list-scheduler-tasks scheduler))))
-
-#+test
-(let (foobar xxx yyy)
-  (defun %foobar () (incf foobar))
-  (defun %xxx () (incf xxx))
-  (defun %yyy () (incf yyy))
-  (funcall
-   (defun test-in-memory-scheduler-1 ()
-     (setf foobar 0 xxx 0 yyy 0)
-     (let* ((scheduler (make-instance 'in-memory-scheduler))
-            (t1 (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)"))
-            (t2 (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")))
-       (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
-       (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
-       (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")
-       (create-scheduler-task scheduler (cons "@shutdown" #'scheduler-implementation::%yyy))
-       ;; we remove one reboot task *before* starting the scheduler
-       (delete-scheduler-task scheduler t1)
-       (let ((thread (bt:make-thread (lambda () (start-scheduler scheduler)))))
-         (sleep 1)
-         ;; and one shutdown task *before* stopping the scheduler
-         (delete-scheduler-task scheduler t2)
-         (sleep 1)
-         (stop-scheduler scheduler)
-         (bt:join-thread thread))
-       (assert (= xxx yyy 2)))))
-  (funcall
-   (defun test-in-memory-scheduler-2 ()
-     (setf foobar 0 xxx 0 yyy 0)
-     (let ((scheduler (make-instance 'in-memory-scheduler)))
-       (create-scheduler-task scheduler "@reboot (scheduler-implementation::%xxx)")
-       (create-scheduler-task scheduler "@shutdown (scheduler-implementation::%yyy)")
-       (create-scheduler-task scheduler "H/2 * * * * (scheduler-implementation::%foobar)")
-       (create-scheduler-task scheduler "* * * * * (scheduler-implementation::%foobar)")
-       (create-scheduler-task scheduler "H/3 * * * * (scheduler-implementation::%foobar)")
-       (let ((thread (bt:make-thread (lambda () (start-scheduler scheduler)))))
-         (sleep 180)
-         (stop-scheduler scheduler)
-         (bt:join-thread thread))
-       (assert (= xxx 1))
-       (assert (= yyy 1))
-       (assert (>= foobar 3))))))
+  (alexandria:removef (list-scheduler-tasks scheduler) task))
 
 
 ;; (list

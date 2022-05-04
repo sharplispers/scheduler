@@ -206,104 +206,143 @@ when task should be repeated, or a keyword `:every`. For example:
 Command is a string, which will be read and evaluated each time the
 task is executed.
 
+## Concurrency
+
+The scheduler does not implement safety measures for concurrent applications.
+Appropriate locks could be introduced by subclassing the scheduler and adding
+them in appropriate places.
+
 ## Reference manual
 
-```
-SCHEDULER:SCHEDULER                                              [class]
-
-Abstract class from which each driver has to inherit. Thread-safety of
-CRUDL operations is implemented in :AROUND methods. Class should not
-have direct instances.
-```
+### Classes
 
 ```
-SCHEDULER:IN-MEMORY-SCHEDULER                                   [class]
+SCHEDULER
+
+Abstract class from which each driver has to inherit.
+```
+
+```
+IN-MEMORY-SCHEDULER
 base-class: SCHEDULER
 
 Reference implementation of a scheduler. Data is kept in a
-memory. Class may be instationalized.
+memory. Class may be instantiated.
 ```
 
 ```
-SCHEDULER:SCHEDULER-TASK                                         [class]
+TASK                                                  [class]
 readers: TIME-SPECS, COMMAND, LAST-OCCURANCE, NEXT-OCCURANCE
 
-Class representing a single task. All scheduler entries added by
-CREATE-SCHEDUELR-TASK should be instances of this class.
+Class representing a single task. All tasks maintained by the
+scheduler must be instances of this class.
+```
+
+### Protocols
+
+```
+CREATE-SCHEDULER-TASK                                  [generic function]
+args: SCHEDULER ENTRY
+
+Parse ENTRY and add the task to SCHEDULER.
+
+
+CREATE-SCHEDULER-TASK                                            [method]
+args: (scheduler SCHEDULER) (entry string)
+
+The method parses a cron-like entry (as specified in the documentation)
+and creates an instance of TASK. Then calls:
+
+    (create-scheduler-task scheduler new-task)
 ```
 
 ```
-SCHEDULER:CREATE-SCHEDULER-TASK                       [generic function]
-args: SCHEDULER CRON-ENTRY
+UPDATE-SCHEDULER-TASK                                  [generic function]
+args: SCHEDULER ENTRY &key &allow-other-keys
 
-Creates and returns scheduler task instance of class SCHEDULER-TASK.
+Update the task designated by ENTRY in SCHEDULER.
+
+
+UPDATE-SCHEDULER-TASK                                            [method]
+args: (scheduler SCHEDULER) (task TASK) &key cron-entry last-run start-at
+
+When CRON-ENTRY is a string, then it is parsed the same as the default
+method on CREATE-SCHEDULER-TASK parses its entry. After updating the
+entry, a new command and a new activation time is updated in TASK.
+
+Otherwise LAST-RUN and START-AT, when supplied, are used to update
+TASK slots.
+
+It is an error to supply both CRON-ENTRY and LAST-RUN or START-AT.
 ```
 
 ```
-SCHEDULER:READ-SCHEDULER-TASK                         [generic function]
-args: SCHEDULER TASK
+READ-SCHEDULER-TASK                                    [generic function]
+args: SCHEDULER ENTRY
 
-Look for a task in scheduler entries. Programmer may specialize second
-argument on other types like UUID.
-```
+Find the task designated by ENTRY in SCHEDULER. Programmer may specialize
+second argument on a desired designator (i.e an UUID).
 
-```
-SCHEDULER:UPDATE-SCHEDULER-TASK                      [generic function]
-args: SCHEDULER TASK &key CRON-ENTRY START-AT &allow-other-keys
 
-Updates TASK. CRON-ENTRY contains TIME-SPECS and command as described
-earlier in this document. START-AT is LOCAL-TIME:TIMESTAMP instance
-used to set a date of the first task invocation.
+READ-SCHEDULER-TASK                                              [method]
+args: (scheduler SCHEDULER) (entry TASK)
 
-If a key argument is not supplied then slot is not updated. Remember,
-that you shouldn't use direct slot write, because scheduler driver may
-store data in a database or in a file. Always update tasks with this
-function.
+Looks for the task in the result of (LIST-SCHEDULER-TASKS scheduler).
+
 ```
 
 ```
-SCHEDULER:DELETE-SCHEDULER-TASK                      [generic function]
-args: SCHEDULER TASK
+DELETE-SCHEDULER-TASK                                  [generic function]
+args: SCHEDULER ENTRY
 
-Removes task from the scheduler so it is not invoked when it's next
-occurance time comes.
+Delete the task designated by ENTRY in SCHEDULER.
 ```
 
 ```
-SCHEDULER:LIST-SCHEDULER-TASKS                       [generic function]
+LIST-SCHEDULER-TASKS                                   [generic function]
 args: SCHEDULER
 
-Returns a list of all tasks associated with the scheduler. List
-elements are instances of class SCHEDULER-TASK.
+Returns a list of all tasks associated with the scheduler.
 ```
 
 ```
-SCHEDULER:START-SCHEDULER                                    [function]
+SCHEDULER:START-SCHEDULER                              [generic function]
 args: SCHEDULER
+
+Start the scheduler.
+
+
+SCHEDULER:START-SCHEDULER                                        [method]
+args: (scheduler SCHEDULER)
 
 Starts scheduler in a loop. Function blocks until STOP-SCHEDULER is
 called, so it may be wise to start it in another thread. All tasks are
-evaluated in the package this function is invoked in. NB: if function
-is started with
+evaluated in the same package that this function is invoked in.
+
+NB: if function is started with
 
   (bt:make-thread (lambda () (scheduler:start-scheduler *s*)))
   
-the package is CL-USER because that is how BORDEAUX-THREADS is
+then the package is CL-USER, because that is how BORDEAUX-THREADS is
 implemented.
 
-If scheduler loop encounters task which was missed (it was meant to be
+If the scheduler loop encounters task which was missed (it was meant to be
 started in the past) it will schedule this tasks by itself in the near
-future (when exactly is not specified). After each task activation
-next activation date is recomputed automatically and updated with
-UPDATE-SCHEDULER-TASK.
+future (it is not specified when exactly). After each task execution, the
+next activation date is recomputed and updated with UPDATE-SCHEDULER-TASK.
 ```
 
 ```
-SCHEDULER:STOP-SCHEDULER                                     [function]
+SCHEDULER:STOP-SCHEDULER                               [generic function]
 args: SCHEDULER
 
-Stops scheduler. Scheduler main function should stop after finishing
-currently pending task loop iteration.
+Stop the scheduler.
+
+SCHEDULER:STOP-SCHEDULER                                         [method]
+args: (scheduler SCHEDULER)
+
+Stops scheduler. The scheduler task loop should stop after finishing the
+current iteration.
 ```
 
 [^1]: Currently only reference scheduler is implemented called
