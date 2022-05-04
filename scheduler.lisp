@@ -292,43 +292,31 @@
 
 
 (defclass scheduler ()
-  ((%state :initform :stopped :accessor scheduler-state)
-   (%lock :initform (bt:make-recursive-lock "scheduler lock") :accessor scheduler-lock))
+  ((%state :initform :stopped :accessor scheduler-state))
   (:documentation "Thread-safe abstract scheduler class."))
 
-(defgeneric create-scheduler-task (scheduler time-entry
-                                   &key start-after &allow-other-keys)
-  (:method :around ((scheduler scheduler) entry &key &allow-other-keys)
-    (declare (ignore entry))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method))))
+(defgeneric create-scheduler-task (scheduler entry &key &allow-other-keys)
+  (:documentation "Parse ENTRY and add the task it to SCHEDULER."))
 
-(defgeneric read-scheduler-task (scheduler task)
-  (:method :around ((scheduler scheduler) task)
-    (declare (ignore task))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method))))
+(defgeneric update-scheduler-task (scheduler entry &key &allow-other-keys)
+  (:documentation "Update the task designated by ENTRY in SCHEDULER."))
 
-(defgeneric update-scheduler-task
-    (scheduler task &key cron-entry start-at &allow-other-keys)
-  (:method :around ((scheduler scheduler) task &key)
-    (declare (ignore task))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method))))
+(defgeneric read-scheduler-task (scheduler entry)
+  (:documentation "Find the task designated by ENTRY in SCHEDULER."))
 
-(defgeneric delete-scheduler-task (scheduler task)
-  (:method :around ((scheduler scheduler) task)
-    (declare (ignore task))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method))))
+(defgeneric delete-scheduler-task (scheduler entry)
+  (:documentation "Delete the task designated by ENTRY in SCHEDULER."))
 
 (defgeneric list-scheduler-tasks (scheduler)
-  (:method :around ((scheduler scheduler))
-    (bt:with-recursive-lock-held ((scheduler-lock scheduler))
-      (call-next-method)))
-  (:documentation "Lists all tasks registered with the scheduler."))
+  (:documentation "Lists all tasks registered with SCHEDULER."))
 
-(defun start-scheduler (scheduler)
+(defgeneric start-scheduler (scheduler)
+  (:documentation "Start the scheduler."))
+
+(defgeneric stop-scheduler (scheduler)
+  (:documentation "Stop the scheduler."))
+
+(defmethod start-scheduler ((scheduler scheduler))
   (format *debug-io* "~&Starting a scheduler.~%")
   (setf (scheduler-state scheduler) :running)
   (labels ((missed-task? (task)
@@ -368,12 +356,12 @@
 
     (run-valid-tasks :reboot)
     (loop while (eql (scheduler-state scheduler) :running)
-       do (progn (run-valid-tasks (local-time:now)) (sleep 1)))
+          do (progn (run-valid-tasks (local-time:now)) (sleep 1)))
     (run-valid-tasks :shutdown))
   (format *debug-io* "~&Exiting a scheduler.~%")
   (setf (scheduler-state scheduler) :stopped))
 
-(defun stop-scheduler (scheduler)
+(defmethod stop-scheduler ((scheduler scheduler))
   (setf (scheduler-state scheduler) :exit))
 
 

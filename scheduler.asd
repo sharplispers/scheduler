@@ -5,7 +5,6 @@
   :license "BSD-2-Clause"
   :description "Extensible task scheduler."
   :depends-on ("alexandria"
-               "bordeaux-threads"
                "split-sequence"
                "local-time"
                "optima"
