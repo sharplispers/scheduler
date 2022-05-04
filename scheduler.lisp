@@ -410,10 +410,15 @@
     ((scheduler scheduler) (task task)
      &key (cron-entry nil ce-p) (last-run nil lr-p) (start-at nil at-p))
   (assert (find task (list-scheduler-tasks scheduler)))
+  ;; We update either the entry itself (then the next occurance is computed), or
+  ;; we've just executed the command and we update last-run and start-at.
+  (assert (alexandria:xor ce-p (or at-p lr-p)))
   (when ce-p
     (mvb (time-specs command) (parse-cron-entry cron-entry)
-      (setf (task-time-specs task) time-specs
-            (task-command task) command)))
+      (setf (task-source-entry task) cron-entry
+            (task-time-specs task) time-specs
+            (task-command task) command
+            (task-next-execution task) (compute-next-occurance time-specs))))
   (when at-p (setf (task-next-execution task) start-at))
   (when lr-p (setf (task-last-execution task) last-run))
   task)
