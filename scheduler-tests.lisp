@@ -76,17 +76,31 @@
                (not (equalp command cmd)))))))
 
 (def-test test-compute-next-occurance ()
-  (flet ((et (&rest args) (apply #'local-time:encode-timestamp 0 0 args))
-         (st (time) (local-time:adjust-timestamp time (set :sec 0))))
-    (is (local-time:timestamp= (st (compute-next-occurance (parse-cron-entry "0 0 1 1 0 foo")))
-                               (et 0 0 1 1 2023)))
-    (is (local-time:timestamp= (st (compute-next-occurance
-                                    (parse-cron-entry "0 0 1 1 * foo") (et 1 0 1 1 2017)))
-                               (et 0 0 1 1 2018)))
-    (is (local-time:timestamp<= (et 0 0 1 1 2018)
-                                (compute-next-occurance
-                                 (parse-cron-entry "H H 1 1 * foo") (et 0 0 2 1 2017))
-                                (et 59 23 1 1 2018)))
+  (flet ((et (mm hh day month year &rest args)
+           (apply #'local-time:encode-timestamp 0 0 mm hh day month year args))
+         (st (time)
+           (local-time:adjust-timestamp time (set :sec 0))))
+    (let ((next-year (1+ (local-time:timestamp-year (local-time:now)))))
+      (is (local-time:timestamp=
+           (st (compute-next-occurance
+                (parse-cron-entry "0 0 1 1 * foo")))
+           (et 0 0 1 1 next-year))))
+    (is (local-time:timestamp=
+         (st (compute-next-occurance
+              (parse-cron-entry "0 0 1 1 0 foo")
+              (et 0 0 18 5 2022)))
+         (et 0 0 1 1 2023)))
+    (is (local-time:timestamp=
+         (st (compute-next-occurance
+              (parse-cron-entry "0 0 1 1 * foo")
+              (et 1 0 1 1 2017)))
+         (et 0 0 1 1 2018)))
+    (is (local-time:timestamp<=
+         (et 0 0 1 1 2018)
+         (compute-next-occurance
+          (parse-cron-entry "H H 1 1 * foo")
+          (et 0 0 2 1 2017))
+         (et 59 23 1 1 2018)))
     (signals error (compute-next-occurance (parse-cron-entry "0 0 0 0 0 foo")))))
 
 #+ (or) ;; this is a run-time test
